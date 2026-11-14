@@ -1,0 +1,33 @@
+{
+  "name": "waldo-stripes-soft",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A fully code-created 3D find-the-man-in-the-crowd game: a festival town of ten thousand animated people built with Three.js. Runs on your own machine.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "scripts": {
+    "dev": "vite --port 5180 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5181 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "zfight": "vite-node scripts/zfight.ts"
+  },
+  "dependencies": {
+    "three": "^0.187.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-node": "^6.0.0",
+    "vitest": "^5.1.0"
+  }
+}

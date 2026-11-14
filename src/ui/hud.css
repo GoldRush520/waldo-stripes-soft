@@ -1,0 +1,195 @@
+/* Keep the town unobstructed: only a clock and the successful-find message. */
+.wss-hud {
+  --wss-gap: clamp(12px, 1vw, 16px);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #3E2C2A;
+  font: 600 16px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.wss-hud *, .wss-hud *::before, .wss-hud *::after { box-sizing: border-box; }
+.wss-hud [hidden] { display: none !important; }
+.wss-hud p { margin: 0; }
+.wss-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.wss-corner {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + var(--wss-gap));
+  right: calc(env(safe-area-inset-right, 0px) + var(--wss-gap));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.wss-timer {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #F7F3EE;
+  box-shadow: 0 2px 12px #5B403820;
+  font-variant-numeric: tabular-nums;
+}
+
+.wss-side { display: flex; flex-direction: column; align-items: flex-end; }
+.wss-side-head { position: relative; }
+/* the only parts of the corner that take clicks: the close button and the button that reopens */
+.wss-side-close, .wss-side-open {
+  pointer-events: auto;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.wss-side-close {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.wss-side-close:hover { opacity: 1; background: #D9B8A855; }
+.wss-side-open {
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #F7F3EE;
+  box-shadow: 0 2px 12px #5B403820;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.wss-side-close:focus-visible, .wss-side-open:focus-visible { outline: 3px solid #8EB8E0; outline-offset: 2px; }
+
+/* the how-to-play card: its layer takes every click so the town waits underneath */
+.wss-howto-root {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  pointer-events: auto;
+}
+.wss-howto-card {
+  display: grid;
+  gap: 12px;
+  width: min(340px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 20px 22px 18px;
+  border-radius: 22px;
+  background: #F7F3EE;
+  box-shadow: 0 8px 32px #5B403826;
+}
+.wss-howto-title { margin: 0; font-size: 26px; font-weight: 800; text-align: center; }
+.wss-howto-steps { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; font-weight: 500; font-size: 15px; }
+.wss-howto-clock { font-weight: 500; font-size: 13px; opacity: 0.75; text-align: center; }
+
+/* the top ten under the clock; the town stays draggable and clickable through it */
+.wss-side-board {
+  width: 208px;
+  padding: 10px 8px 8px;
+  border-radius: 16px;
+  background: #F7F3EEEE;
+  box-shadow: 0 2px 12px #5B403820;
+}
+.wss-side-board .wss-board-title { margin-bottom: 4px; text-align: center; font-size: 12px; }
+.wss-side-board .wss-board-row { grid-template-columns: 1.5em 1fr auto; gap: 6px; padding: 2px 8px; border-radius: 8px; font-size: 13px; }
+.wss-side-board .wss-board-rank { text-align: right; }
+.wss-board-empty { opacity: 0.45; }
+@media (max-width: 520px), (max-height: 520px) {
+  .wss-side-board { width: 164px; padding: 8px 6px 6px; }
+  .wss-side-board .wss-board-row { font-size: 12px; padding: 1px 6px; }
+}
+
+.wss-win-root {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.wss-win-card {
+  pointer-events: auto;
+  user-select: text;
+  display: grid;
+  gap: 12px;
+  width: min(360px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 22px 22px 18px;
+  border-radius: 22px;
+  background: #F7F3EE;
+  box-shadow: 0 8px 32px #5B403826;
+  text-align: center;
+}
+
+.wss-congrats {
+  font-size: clamp(30px, 6vw, 44px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.wss-win-time { font-variant-numeric: tabular-nums; }
+
+.wss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  color: #3E2C2A;
+  text-decoration: none;
+  cursor: pointer;
+}
+.wss-btn:disabled { opacity: 0.55; cursor: default; }
+.wss-btn:focus-visible, .wss-board-name:focus-visible { outline: 3px solid #8EB8E0; outline-offset: 2px; }
+.wss-btn-primary { background: #F28B82; }
+.wss-btn-dark { background: #3E2C2A; color: #F7F3EE; }
+
+.wss-board {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 2px solid #D9B8A866;
+}
+.wss-board-title { margin: 0; font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; }
+.wss-board-form { display: grid; gap: 8px; }
+.wss-board-ask { font-weight: 500; font-size: 14px; }
+.wss-board-fields { display: flex; gap: 8px; }
+.wss-board-name {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 2px solid #D9B8A8;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+.wss-board-note:empty { display: none; }
+.wss-board-note { font-weight: 500; font-size: 14px; }
+.wss-board-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; text-align: left; font-variant-numeric: tabular-nums; }
+.wss-board-row { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 8px; padding: 5px 10px; border-radius: 10px; font-weight: 500; font-size: 15px; }
+.wss-board-rank { opacity: 0.6; }
+.wss-board-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wss-board-own { background: #F2D27A; font-weight: 700; }
