@@ -7,6 +7,7 @@ import { createRng } from '../core/rng';
 
 const INITIAL: GameState = {
   status: 'loading', seed: 'soft-harbour-01', paused: false, reducedMotion: false, quality: 'auto',
+  runId: 0, waiting: false, hintReward: null, hintOutline: null,
   hintLevel: 0, hintText: null, elapsedMs: 0, wrongClicks: 0, hintsUsed: 0,
   secondary: [
     { id: 'juggler', label: 'the juggler', found: false },
@@ -62,7 +63,9 @@ export function createMockApi(): MockApi {
     setWaiting: () => undefined,
     setReducedMotion: (reducedMotion) => emit({ reducedMotion }),
     setQuality: (quality: QualitySetting) => emit({ quality }),
-    requestHint: () => undefined,
+    setHintAdActive: () => undefined,
+    requestHint: () => false,
+    focusHint: () => undefined,
     resetView: () => undefined,
     zoomBy: () => undefined,
     rotateBy: () => undefined,

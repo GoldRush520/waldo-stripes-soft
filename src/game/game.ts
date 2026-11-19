@@ -1,8 +1,8 @@
 /**
  * Game logic for the full-screen puzzle: the player pans a fixed-scale view across the generated
  * town. A puzzle is a random valid hero position (verified against the actual render) that is NOT
- * on the opening screen, plus a densely populated opening view elsewhere. There are no hints and
- * no reference picture. GPU picking decides clicks. The town is reused between puzzles.
+ * on the opening screen, plus a densely populated opening view elsewhere. GPU picking decides
+ * clicks. The town is reused between puzzles.
  */
 import * as THREE from 'three';
 import { createRng, hashString } from '../core/rng';
@@ -11,8 +11,9 @@ import type { PersonRecord } from '../crowd/stores';
 import type { Engine, QualityName } from '../render/engine';
 import { WORLD, districtById, isLand, pointInPolygon } from '../world/layout';
 import type { HeroCandidate, Town } from '../world/town';
-import type { ClickFeedback, GameApi, GameState, QualitySetting, SecondaryTarget } from './api';
+import type { ClickFeedback, GameApi, GameState, HintOutline, QualitySetting, SecondaryTarget } from './api';
 import { type Rect, VIEW_ELEVATION, type ViewSpec, basePpm, clampView, projectPoint, screenHeight } from './composition';
+import { type SearchArea, searchAreas } from './searchHints';
 
 const SECONDARY_COUNT = 5;
 /** GPU visibility checks are spent on at most this many shortlisted candidates per puzzle */
@@ -31,6 +32,8 @@ const MIN_COMPANY = 9;
 
 const INITIAL: GameState = {
   status: 'loading',
+  runId: 0,
+  waiting: false,
   seed: '',
   paused: false,
   reducedMotion: false,
@@ -40,6 +43,8 @@ const INITIAL: GameState = {
   elapsedMs: 0,
   wrongClicks: 0,
   hintsUsed: 0,
+  hintReward: null,
+  hintOutline: null,
   secondary: [],
   lastClick: null,
   marker: null,
@@ -105,6 +110,9 @@ export class Game implements GameApi {
   private dirty = false;
   private town: Town | null = null;
   private serial = 0;
+  private inputEpoch = 0;
+  private hintAdActive = false;
+  private hintPlan: readonly SearchArea[] | null = null;
   private readonly projected = new THREE.Vector3();
   private secondaryPeople = new Map<number, string>();
   private probe: ReturnType<Town['crowd']['createProbe']> | null = null;
@@ -114,8 +122,6 @@ export class Game implements GameApi {
   private puzzleCount = 0;
   private peoplePos = new Float32Array(0);
   private peopleKind = new Uint8Array(0);
-  /** the how-to-play card is up: the clock waits and the town cannot be moved or clicked */
-  private waiting = false;
   /** HUD rectangles in CSS px (kept for layout-aware features; the hero is found by panning) */
   hudBlocks: () => readonly Rect[] = () => [];
 
@@ -221,6 +227,8 @@ export class Game implements GameApi {
   private async beginPuzzle(seedText: string, relocate: boolean): Promise<void> {
     const town = this.town;
     if (!town) return;
+    this.inputEpoch++;
+    if (relocate) this.hintPlan = null;
     const t0 = performance.now();
     const { width, height } = this.engine.rig.size;
     if (relocate) {
@@ -316,15 +324,18 @@ export class Game implements GameApi {
     const pool = rng2.shuffle(town.build.searchables.filter((sch) => town.build.people.get(sch.person).motion < 0)).slice(0, SECONDARY_COUNT);
     this.secondaryPeople = new Map(pool.map((sch) => [sch.person, sch.label]));
     const secondary: SecondaryTarget[] = pool.map((sch) => ({ id: String(sch.person), label: sch.label, found: false }));
-    this.engine.paused = this.state.paused;
+    this.engine.paused = this.state.paused || this.hintAdActive;
     this.set({
       status: 'playing',
+      runId: this.state.runId + 1,
       seed: seedText,
-      hintLevel: 0,
+      hintLevel: relocate ? 0 : this.state.hintLevel,
       hintText: null,
       elapsedMs: 0,
       wrongClicks: 0,
-      hintsUsed: 0,
+      hintsUsed: relocate ? 0 : this.state.hintsUsed,
+      hintReward: relocate ? 'range' : this.state.hintReward,
+      hintOutline: null,
       secondary,
       lastClick: null,
       marker: null,
@@ -480,10 +491,11 @@ export class Game implements GameApi {
   /** Per-frame hook (called from the engine loop): clock, marker projection, batched notify. */
   update(realDt: number): void {
     const s = this.state;
-    if (s.status === 'playing' && !s.paused && !this.waiting && realDt > 0) {
+    if (s.status === 'playing' && !s.paused && !s.waiting && !this.hintAdActive && realDt > 0) {
       this.state = { ...s, elapsedMs: s.elapsedMs + realDt * 1000 };
     }
     this.updateMarker();
+    this.updateHintOutline();
     if (this.dirty) {
       this.dirty = false;
       const snapshot = this.state;
@@ -512,9 +524,9 @@ export class Game implements GameApi {
     let next: GameState['marker'] = null;
     const ppm = this.engine.rig.pixelsPerMetre;
     const hero = town.hero.spot;
-    if (s.status === 'won') {
+    if (s.status === 'won' || (s.status === 'playing' && s.hintLevel === 3)) {
       const p = this.screen(hero.x, hero.y + 0.95, hero.z);
-      next = { x: p.x, y: p.y, radius: Math.max(30, ppm * 1.35), kind: 'found' };
+      next = { x: p.x, y: p.y, radius: Math.max(30, ppm * 1.35), kind: s.status === 'won' ? 'found' : 'reveal' };
     }
     const prev = s.marker;
     const same =
@@ -524,6 +536,28 @@ export class Game implements GameApi {
       this.state = { ...this.state, marker: next };
       this.dirty = true;
     }
+  }
+
+  private get hintArea(): SearchArea | undefined {
+    return this.hintPlan?.[this.state.hintsUsed - 1];
+  }
+
+  private updateHintOutline(): void {
+    const s = this.state;
+    const area = s.status === 'playing' ? this.hintArea : undefined;
+    let outline: HintOutline | null = null;
+    if (area && this.town) {
+      const y = this.town.hero.spot.y;
+      outline = [
+        this.screen(area.minX, y, area.minZ), this.screen(area.maxX, y, area.minZ),
+        this.screen(area.maxX, y, area.maxZ), this.screen(area.minX, y, area.maxZ),
+      ].map(({ x, y: screenY }) => [x, screenY] as const);
+    }
+    const previous = s.hintOutline;
+    if (outline === null ? previous === null : previous && outline.every(([x, y], index) =>
+      Math.abs(x - previous[index][0]) < 0.4 && Math.abs(y - previous[index][1]) < 0.4)) return;
+    this.state = { ...this.state, hintOutline: outline };
+    this.dirty = true;
   }
 
   /* ---------------------------------------------------------------- picking */
@@ -540,23 +574,24 @@ export class Game implements GameApi {
   }
 
   private click(x: number, y: number): void {
-    if (this.waiting) return;
+    if (this.state.waiting || this.hintAdActive) return;
     const town = this.town;
     if (!town || this.state.status !== 'playing') return;
     const serial = ++this.serial;
+    const epoch = this.inputEpoch;
     this.engine
       .pickAsync(x, y, (render) => {
         town.setPickMode(true);
         render();
         town.setPickMode(false);
       })
-      .then((id) => this.resolveClick(id, x, y, serial))
-      .catch(() => this.resolveClick(0, x, y, serial));
+      .then((id) => this.resolveClick(id, x, y, serial, epoch))
+      .catch(() => this.resolveClick(0, x, y, serial, epoch));
   }
 
-  private resolveClick(id: number, x: number, y: number, serial: number): void {
+  private resolveClick(id: number, x: number, y: number, serial: number, epoch: number): void {
     const town = this.town;
-    if (!town || this.state.status !== 'playing') return;
+    if (!town || this.state.status !== 'playing' || this.state.waiting || this.hintAdActive || epoch !== this.inputEpoch) return;
     const person = id - 1;
     const feedback = (kind: ClickFeedback['kind'], message: string | null): ClickFeedback => ({ kind, x, y, serial, message });
     if (id > 0 && person === town.hero.person) {
@@ -590,13 +625,13 @@ export class Game implements GameApi {
   }
 
   setPaused(paused: boolean): void {
-    this.engine.paused = paused;
+    this.engine.paused = paused || this.hintAdActive;
     this.set({ paused });
   }
 
   setWaiting(waiting: boolean): void {
-    this.waiting = waiting;
-    this.engine.rig.pannable = !waiting;
+    this.engine.rig.pannable = !waiting && !this.hintAdActive;
+    this.set({ waiting });
   }
 
   setReducedMotion(on: boolean): void {
@@ -612,9 +647,45 @@ export class Game implements GameApi {
     this.set({ quality: q });
   }
 
-  /** There are no hints in this game (direct user instruction); kept as a no-op for the HUD contract. */
-  requestHint(): void {
-    /* intentionally empty */
+  setHintAdActive(active: boolean): void {
+    if (active === this.hintAdActive) return;
+    if (active) this.inputEpoch++;
+    this.hintAdActive = active;
+    this.engine.paused = this.state.paused || active;
+    this.engine.rig.pannable = !this.state.waiting && !active;
+    this.engine.invalidate();
+  }
+
+  requestHint(runId: number): boolean {
+    const town = this.town;
+    const state = this.state;
+    if (!town || !this.hintAdActive || state.runId !== runId || state.status !== 'playing' || state.waiting || !state.hintReward) return false;
+
+    if (!this.hintPlan) {
+      const candidates = town.build.people.all().filter((person, index) =>
+        index !== town.hero.person && person.motion < 0 && !person.roaming && person.scale >= 0.1);
+      this.hintPlan = searchAreas(town.hero.spot, candidates, state.seed);
+    }
+    const hintsUsed = state.hintsUsed + 1;
+    const revealed = state.hintReward === 'reveal';
+    const hintReward = revealed ? null : hintsUsed >= this.hintPlan.length ? 'reveal' : 'shrink';
+    this.set({ hintsUsed, hintLevel: revealed ? 3 : 2, hintReward });
+    this.focusHint();
+    return true;
+  }
+
+  focusHint(): void {
+    const spot = this.town?.hero.spot;
+    if (!spot || this.state.status !== 'playing' || this.state.hintsUsed === 0) return;
+    const area = this.hintArea;
+    const x = area ? (area.minX + area.maxX) / 2 : spot.x;
+    const z = area ? (area.minZ + area.maxZ) / 2 : spot.z;
+    const height = spot.y + (area ? 0 : 0.95);
+    const view = this.engine.rig.state;
+    this.engine.rig.setView({
+      x: x - Math.sin(view.azimuth) * height / Math.tan(view.elevation),
+      z: z - Math.cos(view.azimuth) * height / Math.tan(view.elevation),
+    }, true);
   }
 
   /* zoom and orbit are not part of the product; these stay as harmless no-ops */
@@ -631,13 +702,13 @@ export class Game implements GameApi {
   }
 
   restart(): void {
-    if (!this.town) return;
+    if (!this.town || this.state.status === 'loading') return;
     void this.beginPuzzle(this.state.seed, false);
   }
 
   /** A new puzzle in the same generated scene: new hero position and composition, no rebuild. */
   newPuzzle(seed?: string): void {
-    if (!this.town) return;
+    if (!this.town || this.state.status === 'loading') return;
     const text = seed && seed.trim() ? seed.trim() : randomSeed();
     this.beginPuzzle(text, true).catch((error: unknown) => this.onFailure?.(error));
   }

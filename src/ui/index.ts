@@ -1,12 +1,17 @@
 /** Game overlay: elapsed time and the top ten in the corner, then congratulations when Waldo is found. */
 import './hud.css';
+import { debugParams } from '../dev/debugParams';
 import type { GameApi, GameState } from '../game/api';
+import { createSearchHintPanel } from './ads/searchHintPanel';
+import { createTapTapRewardedVideo, TAPTAP_AD_UNIT_ID_PLACEHOLDER } from './ads/taptap';
 import { changed, enteredStatus } from './diff';
 import { createDisposer, el, setText } from './dom';
 import { formatTime } from './format';
 import { createHowToPlay } from './howToPlay';
 import { createBoardModel } from './leaderboard/model';
 import { createSideBoard } from './leaderboard/sideBoard';
+import { TAPTAP_LEADERBOARD_ID_PLACEHOLDER } from './leaderboard/taptap';
+import { createTapTapWinCard } from './leaderboard/taptapPanel';
 import { rememberReducedMotion } from './preferences';
 import { trackSafeInsets } from './safeInsets';
 import type { HudContext, HudPart } from './types';
@@ -53,19 +58,27 @@ export function mountHud(root: HTMLElement, api: GameApi): HudHandle {
   const refreshClock = (): void => setText(timer, formatTime(api.getState().elapsedMs));
   const clock = window.setInterval(refreshClock, 250);
   disposer.add(() => window.clearInterval(clock));
-  const board = createBoardModel();
-  const side = createSideBoard(board);
-  disposer.add(side.dispose);
-  /* the clock with the top ten under it, in the top right corner */
-  const corner = el('div', { className: 'wss-corner' }, [timer, side.el]);
-  const win = createWinCard(ctx, board);
+  const board = import.meta.env.MODE === 'taptap' ? null : createBoardModel();
+  const corner = el('div', { className: 'wss-corner' }, [timer]);
+  if (board) {
+    const side = createSideBoard(board);
+    disposer.add(side.dispose);
+    corner.append(side.el);
+  }
+  const win = board ? createWinCard(ctx, board) : createTapTapWinCard(
+    ctx, import.meta.env.VITE_TAPTAP_LEADERBOARD_ID || TAPTAP_LEADERBOARD_ID_PLACEHOLDER,
+  );
   const howTo = createHowToPlay(ctx);
-  const parts: readonly HudPart[] = [howTo, win];
+  const parts: HudPart[] = [howTo, win];
+  if (import.meta.env.MODE === 'taptap') {
+    const id: string = import.meta.env.VITE_TAPTAP_REWARDED_AD_UNIT_ID || TAPTAP_AD_UNIT_ID_PLACEHOLDER;
+    const mock = debugParams(location).get('mockAds') === '1';
+    parts.push(createSearchHintPanel(ctx, mock ? null : createTapTapRewardedVideo(id)));
+  }
 
   hud.append(
     corner,
-    howTo.el,
-    win.el,
+    ...parts.map((part) => part.el),
     announcer.el,
   );
   root.appendChild(hud);
@@ -76,7 +89,7 @@ export function mountHud(root: HTMLElement, api: GameApi): HudHandle {
     syncRootFlags(hud, prev, next);
     refreshClock();
     /* a puzzle has started: show the current top ten (the win card refreshes it again later) */
-    if (enteredStatus(prev, next, 'playing')) {
+    if (board && enteredStatus(prev, next, 'playing')) {
       board.startRun();
       void board.refresh();
     }

@@ -14,6 +14,7 @@ import { shortcutFor } from '../../src/ui/shortcuts';
 
 const base: GameState = {
   status: 'playing', seed: 'abc', paused: false, reducedMotion: false, quality: 'auto', hintLevel: 0,
+  runId: 1, waiting: false, hintReward: null, hintOutline: null,
   hintText: null, elapsedMs: 0, wrongClicks: 0, hintsUsed: 0, secondary: [], lastClick: null, marker: null, progress: 1,
 };
 const withState = (patch: Partial<GameState>): GameState => ({ ...base, ...patch });

@@ -49,11 +49,12 @@ function scoreStore(): ScoreStore {
   return chosen === IN_MEMORY ? new MemoryStore() : new FileStore(path.resolve(import.meta.dirname, DATA_FOLDER, chosen));
 }
 
-export default defineConfig({
-  plugins: [leaderboardApi({ store: scoreStore(), onError: toTerminal })],
-  build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
+export default defineConfig(({ mode }) => ({
+  base: mode === 'taptap' ? './' : '/',
+  plugins: mode === 'taptap' ? [] : [leaderboardApi({ store: scoreStore(), onError: toTerminal })],
+  build: { target: 'es2022', chunkSizeWarningLimit: 2000, outDir: mode === 'taptap' ? 'dist-taptap' : 'dist' },
   /* cors: false = no other origin, not even another local server, is told it may read a response */
   server: { host: HOST, hmr: false, cors: false, headers: HEADERS },
   preview: { host: HOST, cors: false, headers: HEADERS },
   test: { environment: 'node', include: ['tests/unit/**/*.test.ts'] },
-});
+}));

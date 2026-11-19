@@ -325,7 +325,7 @@ export class CameraRig {
   };
 
   private applyKeys(dt: number): void {
-    if (this.keys.size === 0) return;
+    if (!this.pannable || this.keys.size === 0) return;
     const speed = 520 * dt;
     const k = this.keys;
     let dx = 0;

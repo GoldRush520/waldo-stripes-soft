@@ -9,7 +9,7 @@ assets and no downloaded models. Every mesh, pattern and animation is generated 
 
 You look down on the town at a fixed scale and pan around to find one man: striped shirt, bobble
 hat, round glasses, blue trousers, walking stick. He is somewhere different on every visit and never
-on the opening screen. There are no hints.
+on the opening screen. The standard browser build plays without hints.
 
 ## Run it
 
@@ -70,6 +70,44 @@ The times are whatever the browser reports. They are checked for plausibility (2
 6 hours, whole milliseconds, a clean username) but anyone at the keyboard can post a made-up time,
 and the developer switches below show where Waldo is. This is a board for you and the people you
 hand the laptop to, not a competition.
+
+### TapTap H5 leaderboard
+
+`npm run build:taptap` builds the H5 package in `dist-taptap/` with relative asset URLs.
+The build defaults to `TAPTAP_LEADERBOARD_ID_PLACEHOLDER`. To build with your TapTap board ID:
+
+```bash
+VITE_TAPTAP_LEADERBOARD_ID=your_leaderboard_id npm run build:taptap
+```
+
+Create a public, permanent leaderboard in the TapTap developer console. Set the score to a
+numeric integer (milliseconds), sort ascending, and retain the best score. Upload the H5 build
+and verify it in the TapTap client with a test account. The H5 win card automatically submits the
+run if no hints were used, shows your best time and rank, and opens TapTap's leaderboard. The
+placeholder and ordinary browsers show an availability message. Play and the run result continue
+if the board is unavailable. Choose **再玩一局** after a result to start a new puzzle in the same town.
+
+### TapTap rewarded hints
+
+The H5 build defaults to `TAPTAP_REWARDED_AD_UNIT_ID_PLACEHOLDER`, which hides the ad entry.
+To enable live ads, create a rewarded-video placement in the TapTap developer console and build with:
+
+```sh
+VITE_TAPTAP_REWARDED_AD_UNIT_ID=your_ad_unit_id npm run build:taptap
+```
+
+Include `VITE_TAPTAP_LEADERBOARD_ID` in the same build to enable the leaderboard. Upload the output
+and check live playback, completion and cancellation in the TapTap client. To exercise the UI
+locally with the placeholder, run `npm run dev -- --mode taptap` and open `/?mockAds=1`.
+The localhost simulator bypasses the 60-second grace period and offers complete, early-close and
+failure outcomes.
+
+The first hint encloses about 96 stationary candidates. Each additional hint drops about half
+until the area contains at most eight candidates. The following reward marks Waldo. Completed
+ads grant a hint and turn the puzzle into a practice result. Restarts preserve the puzzle's
+hints, while a new puzzle starts with a fresh score. The H5 build emits local `waldo:ad-metric`
+events for the hint funnel and run outcomes. Connect a collector before using those events for
+production reporting.
 
 ## Security
 

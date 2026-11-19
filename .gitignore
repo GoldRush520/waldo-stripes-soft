@@ -1,6 +1,7 @@
 # dependencies and build output
 node_modules/
 dist/
+dist-taptap/
 
 # saved times of the local leaderboard (yours, not the project's)
 data/

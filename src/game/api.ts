@@ -7,6 +7,8 @@ export type QualitySetting = 'auto' | 'low' | 'medium' | 'high';
 
 /** 0 = no hint yet, 1 = district named, 2 = vicinity ring shown, 3 = explicit reveal. */
 export type HintLevel = 0 | 1 | 2 | 3;
+export type HintReward = 'range' | 'shrink' | 'reveal';
+export type HintOutline = readonly (readonly [x: number, y: number])[];
 
 export interface SecondaryTarget {
   readonly id: string;
@@ -29,6 +31,8 @@ export interface ClickFeedback {
 
 export interface GameState {
   readonly status: 'loading' | 'playing' | 'won';
+  readonly runId: number;
+  readonly waiting: boolean;
   /** human-readable puzzle seed shown in the HUD and accepted by newPuzzle() */
   readonly seed: string;
   readonly paused: boolean;
@@ -40,6 +44,8 @@ export interface GameState {
   readonly elapsedMs: number;
   readonly wrongClicks: number;
   readonly hintsUsed: number;
+  readonly hintReward: HintReward | null;
+  readonly hintOutline: HintOutline | null;
   readonly secondary: readonly SecondaryTarget[];
   readonly lastClick: ClickFeedback | null;
   /** screen position (CSS px) of the hint ring / found marker when one should be drawn, else null */
@@ -60,8 +66,9 @@ export interface GameApi {
   setWaiting(waiting: boolean): void;
   setReducedMotion(on: boolean): void;
   setQuality(q: QualitySetting): void;
-  /** Advance to the next hint level (1 → 2 → 3). Level 3 (reveal) must be confirmed by the HUD first. */
-  requestHint(): void;
+  setHintAdActive(active: boolean): void;
+  requestHint(runId: number): boolean;
+  focusHint(): void;
   resetView(): void;
   zoomBy(factor: number): void;
   rotateBy(radians: number): void;
