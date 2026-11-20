@@ -5,9 +5,9 @@ import type { AdOutcome, RewardedVideo } from './taptap';
 
 const STARTUP_GRACE_MS = 60_000;
 const REWARD_COPY: Readonly<Record<HintReward, string>> = {
-  range: '圈出 Waldo 所在的搜索范围。',
+  range: '圈出条纹衫旅人所在的搜索范围。',
   shrink: '把搜索范围内的候选人数缩减约一半。',
-  reveal: '直接标出 Waldo，由你亲手点中他。',
+  reveal: '直接标出条纹衫旅人，由你亲手点中他。',
 };
 
 const RESULT_COPY: Readonly<Record<Exclude<AdOutcome, 'completed'>, string>> = {
@@ -76,7 +76,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     setHidden(entry, !available);
     setHidden(review, !playing || state.hintsUsed === 0);
     setHidden(controls, !playing || (!available && state.hintsUsed === 0 && !note.textContent));
-    const label = state.hintReward === 'reveal' ? '标出 Waldo' : state.hintsUsed ? '缩小范围' : '搜索提示';
+    const label = state.hintReward === 'reveal' ? '标出旅人' : state.hintsUsed ? '缩小范围' : '搜索提示';
     if (entry.textContent !== label) setText(entry, label);
     setHidden(marker, reveal === null);
     if (reveal) marker.style.transform = `translate(${reveal.x}px, ${reveal.y}px) translate(-50%, -50%)`;
@@ -101,7 +101,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
       if (outcome === 'completed') {
         if (ctx.api.requestHint(current.state.runId)) {
           const hint = ctx.api.getState();
-          const text = current.reward === 'reveal' ? '已标出 Waldo，点中他完成本局。' : '已圈出新的搜索范围。';
+          const text = current.reward === 'reveal' ? '已标出条纹衫旅人，点中他完成本局。' : '已圈出新的搜索范围。';
           setText(note, text);
           record('hint_granted', hint, { reward: current.reward });
         }

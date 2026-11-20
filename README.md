@@ -73,7 +73,7 @@ hand the laptop to, not a competition.
 
 ### TapTap H5 leaderboard
 
-`npm run build:taptap` builds the H5 package in `dist-taptap/` with relative asset URLs.
+`npm run build:taptap` builds the Simplified Chinese H5 package in `dist-taptap/` with relative asset URLs.
 The build defaults to `TAPTAP_LEADERBOARD_ID_PLACEHOLDER`. To build with your TapTap board ID:
 
 ```bash

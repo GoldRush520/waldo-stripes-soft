@@ -51,7 +51,15 @@ function scoreStore(): ScoreStore {
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'taptap' ? './' : '/',
-  plugins: mode === 'taptap' ? [] : [leaderboardApi({ store: scoreStore(), onError: toTerminal })],
+  plugins: mode === 'taptap' ? [{
+    name: 'taptap-page-metadata',
+    transformIndexHtml(html) {
+      return html
+        .replace('<html lang="en">', '<html lang="zh-CN">')
+        .replace(/<title>[^<]*<\/title>/, '<title>人海小镇</title>')
+        .replace(/(<meta name="description" content=")[^"]*/, '$1在热闹的海滨小镇里寻找条纹衫旅人，挑战你的最快用时。');
+    },
+  }] : [leaderboardApi({ store: scoreStore(), onError: toTerminal })],
   build: { target: 'es2022', chunkSizeWarningLimit: 2000, outDir: mode === 'taptap' ? 'dist-taptap' : 'dist' },
   /* cors: false = no other origin, not even another local server, is told it may read a response */
   server: { host: HOST, hmr: false, cors: false, headers: HEADERS },

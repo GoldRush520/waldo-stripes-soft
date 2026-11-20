@@ -43,20 +43,24 @@ function fail(error: unknown): void {
     'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(420px,86vw);padding:20px 22px;border-radius:16px;background:#F7F3EE;border:1px solid #D9B8A8;box-shadow:0 10px 30px rgba(91,64,56,.18);font:15px/1.45 system-ui,sans-serif;color:#5B4038;text-align:center';
   const text = document.createElement('p');
   text.style.margin = '0 0 14px';
-  text.textContent = 'The festival town could not be set up this time.';
-  const detail = document.createElement('p');
-  detail.style.cssText = 'margin:0 0 14px;font-size:12px;opacity:.75';
-  detail.textContent = error instanceof Error ? error.message : String(error);
+  text.textContent = import.meta.env.MODE === 'taptap' ? '小镇加载失败，请重试。' : 'The festival town could not be set up this time.';
+  box.append(text);
+  if (import.meta.env.MODE !== 'taptap' || params.has('dev')) {
+    const detail = document.createElement('p');
+    detail.style.cssText = 'margin:0 0 14px;font-size:12px;opacity:.75';
+    detail.textContent = error instanceof Error ? error.message : String(error);
+    box.append(detail);
+  }
   const retry = document.createElement('button');
   retry.type = 'button';
-  retry.textContent = 'Try a new scene';
+  retry.textContent = import.meta.env.MODE === 'taptap' ? '重试' : 'Try a new scene';
   retry.style.cssText = 'font:inherit;padding:9px 16px;border-radius:999px;border:0;background:#F28B82;color:#3E2C2A;cursor:pointer';
   retry.addEventListener('click', () => {
     const url = new URL(location.href);
     url.searchParams.delete('seed');
     location.assign(url);
   });
-  box.append(text, detail, retry);
+  box.append(retry);
   document.body.appendChild(box);
   retry.focus();
 }

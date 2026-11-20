@@ -52,7 +52,7 @@ export function mountHud(root: HTMLElement, api: GameApi): HudHandle {
   const timer = el('div', {
     className: 'wss-timer',
     text: '00:00',
-    attrs: { role: 'timer', 'aria-label': 'Elapsed time', 'aria-live': 'off' },
+    attrs: { role: 'timer', 'aria-label': import.meta.env.MODE === 'taptap' ? '本局用时' : 'Elapsed time', 'aria-live': 'off' },
   });
   // Game time advances without emitting state changes every frame.
   const refreshClock = (): void => setText(timer, formatTime(api.getState().elapsedMs));
