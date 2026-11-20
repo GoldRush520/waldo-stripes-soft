@@ -3,6 +3,7 @@ import { el, setHidden, setText } from '../dom';
 import type { HudContext, HudPart } from '../types';
 import { createCompletionCard } from '../winCard';
 import { createTapTapLeaderboard } from './taptap';
+import { STAGES } from '../../game/campaign';
 
 export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): HudPart {
   const board = createTapTapLeaderboard(leaderboardId);
@@ -11,11 +12,12 @@ export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): Hud
   const open = el('button', { className: 'wss-btn', text: '查看排行榜', attrs: { type: 'button' } });
   const again = el('button', { className: 'wss-btn wss-btn-primary', text: '再玩一局', attrs: { type: 'button' } });
   const retry = el('button', { className: 'wss-btn', text: '重试提交', attrs: { type: 'button' } });
-  let current: { readonly elapsedMs: number; readonly hintsUsed: number; submitting: boolean } | null = null;
+  const campaign = ctx.api.campaign;
+  let current: { readonly elapsedMs: number; readonly practice: boolean; submitting: boolean } | null = null;
 
   async function submit(): Promise<void> {
     const run = current;
-    if (!run || run.hintsUsed > 0 || run.submitting) return;
+    if (!run || campaign?.district || run.practice || run.submitting) return;
     run.submitting = true;
     setHidden(retry, true);
     setText(note, '正在提交成绩…');
@@ -46,7 +48,9 @@ export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): Hud
   ctx.disposer.listen(again, 'click', () => {
     if (ctx.api.getState().status !== 'won') return;
     again.disabled = true;
-    ctx.api.newPuzzle();
+    const state = ctx.api.getState();
+    if (campaign?.district && !state.adPlayed) ctx.api.enterStage?.(campaign.stage+1);
+    else ctx.api.newPuzzle();
   });
   ctx.disposer.listen(open, 'click', async () => {
     const run = current;
@@ -67,13 +71,22 @@ export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): Hud
     elements: [again, el('div', { className: 'wss-board' }, [note, open, retry, openNote])],
     open(state): void {
       const unavailable = board.unavailable();
-      current = { elapsedMs: state.elapsedMs, hintsUsed: state.hintsUsed, submitting: false };
+      current = { elapsedMs: state.elapsedMs, practice: !!state.adPlayed || state.hintsUsed > 0, submitting: false };
       again.disabled = false;
       setHidden(retry, true);
       setHidden(open, unavailable !== null);
       open.disabled = false;
       setText(openNote, '');
-      if (state.hintsUsed > 0) setText(note, `练习成绩 · 使用 ${state.hintsUsed} 次提示 · 不计入竞速排名`);
+      if (campaign?.district) {
+        setHidden(open, true);
+        const nextStage = campaign.stage+1;
+        setText(again, current.practice ? '重试本关' : `下一关 · ${STAGES[nextStage-1]![1]}`);
+        const best = campaign.best.get(campaign.stage);
+        setText(note, current.practice ? '练习成绩 · 观看过广告，本局无法解锁下一关。' :
+          `已解锁第 ${nextStage} 关 · 本关最佳 ${formatRunTime(best ?? state.elapsedMs)}`);
+        if (!campaign.saved) setText(openNote, '本机存档不可用，离开游戏可能丢失进度。');
+      }
+      else if (current.practice) setText(note, '练习成绩 · 本局不计入孤勇者榜');
       else if (unavailable) setText(note, unavailable);
       else void submit();
     },

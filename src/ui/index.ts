@@ -60,6 +60,10 @@ export function mountHud(root: HTMLElement, api: GameApi): HudHandle {
   disposer.add(() => window.clearInterval(clock));
   const board = import.meta.env.MODE === 'taptap' ? null : createBoardModel();
   const corner = el('div', { className: 'wss-corner' }, [timer]);
+  if (api.campaign) {
+    corner.classList.add('wss-campaign-corner');
+    corner.prepend(el('span', {text:`第 ${api.campaign.stage} 关 · ${api.campaign.name}`}));
+  }
   if (board) {
     const side = createSideBoard(board);
     disposer.add(side.dispose);

@@ -1,7 +1,7 @@
 {
   "name": "waldo-stripes-soft",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A fully code-created 3D find-the-man-in-the-crowd game: a festival town of ten thousand animated people built with Three.js. Runs on your own machine.",
   "license": "MIT",
   "type": "module",

@@ -6,6 +6,8 @@
 import type { GameState } from '../game/api';
 import { el, setHidden } from './dom';
 import { enteredStatus } from './diff';
+import { STAGES } from '../game/campaign';
+import { formatRunTime } from '../../shared/leaderboard';
 import type { HudContext, HudPart } from './types';
 
 const COPY = import.meta.env.MODE === 'taptap' ? {
@@ -39,6 +41,25 @@ export function createHowToPlay(ctx: HudContext): HudPart {
     start,
   ]);
   /* the layer covers the whole screen so the town underneath cannot be dragged or clicked */
+  const campaign = ctx.api.campaign;
+  if (campaign) {
+    card.querySelector('h2')!.textContent = `第 ${campaign.stage} 关 · ${campaign.name}`;
+    const steps = card.querySelector('ol')!;
+    steps.replaceChildren(...[
+      '单指拖动，双指缩放，点中条纹衫旅人。',
+      campaign.district ? '不看广告通关，解锁下一关。' : '不看广告通关，挑战孤勇者榜。',
+    ].map(text => el('li', {text})));
+    if (campaign.unlocked > 1) {
+      const select = el('select', {className:'wss-stage-select', attrs:{'aria-label':'选择已解锁关卡'}});
+      for (let i = 1; i <= campaign.unlocked; i++) {
+        const best = campaign.best.get(i);
+        select.append(el('option', {attrs:{value:String(i)}, text:`第 ${i} 关 · ${STAGES[i-1]![1]}${best ? ' · 最佳 '+formatRunTime(best) : ''}`}));
+      }
+      select.value = String(campaign.stage);
+      ctx.disposer.listen(select, 'change', () => ctx.api.enterStage?.(Number(select.value)));
+      card.insertBefore(select, start);
+    }
+  }
   const root = el('div', { className: 'wss-howto-root' }, [card]);
   root.hidden = true;
   let shown = false;

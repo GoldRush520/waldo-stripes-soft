@@ -1,4 +1,5 @@
 import { Game, randomSeed } from './game/game';
+import { loadCampaign } from './game/campaign';
 import { Engine } from './render/engine';
 import { hudSafeInsets, mountHud } from './ui/index';
 import { debugParams } from './dev/debugParams';
@@ -6,7 +7,8 @@ import { installDevTools } from './dev/devTools';
 import { Town } from './world/town';
 
 const engine = new Engine(document.getElementById('app') as HTMLElement);
-const game = new Game(engine);
+const campaign = import.meta.env.MODE === 'taptap' ? loadCampaign() : undefined;
+const game = new Game(engine, campaign);
 /* debugging switches only work on a developer's own machine; a public host ignores them all */
 const params = debugParams(location);
 /* every visit gets a fresh local seed; `?seed=` is a debugging override for reproducible scenes */
@@ -79,7 +81,7 @@ Town.create(
     boot.progress = p * 0.95;
     game.setProgress(p * 0.95);
   },
-  { jointTexture },
+  { jointTexture, ...(campaign?.district ? { only: [campaign.district.id] } : {}) },
 )
   .then(async (built) => {
     boot.stage = 'composing';

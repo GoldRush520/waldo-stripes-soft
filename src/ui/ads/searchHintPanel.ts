@@ -3,7 +3,6 @@ import { el, setHidden, setText } from '../dom';
 import type { HudContext, HudPart } from '../types';
 import type { AdOutcome, RewardedVideo } from './taptap';
 
-const STARTUP_GRACE_MS = 60_000;
 const REWARD_COPY: Readonly<Record<HintReward, string>> = {
   range: '圈出条纹衫旅人所在的搜索范围。',
   shrink: '把搜索范围内的候选人数缩减约一半。',
@@ -65,8 +64,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
   let views = 0;
 
   function canWatch(state: GameState): boolean {
-    return state.status === 'playing' && !state.waiting && !state.paused && state.hintReward !== null
-      && (mock || (performance.now() >= STARTUP_GRACE_MS && video.available()));
+    return state.status === 'playing' && !state.waiting && !state.paused && state.hintReward !== null;
   }
 
   function refresh(state = ctx.api.getState()): void {
@@ -96,6 +94,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     if (attempt !== current) return;
     const state = ctx.api.getState();
     record('ad_result', current.state, { outcome, reward: current.reward });
+    if (mock && (outcome === 'completed' || outcome === 'closed')) ctx.api.markAdPlayed?.(current.state.runId);
     if (outcome === 'completed' && state.runId === current.state.runId) views++;
     if (state.runId === current.state.runId && state.status === 'playing') {
       if (outcome === 'completed') {
@@ -115,12 +114,14 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
   ctx.disposer.listen(entry, 'click', () => {
     const state = ctx.api.getState();
     if (attempt || !canWatch(state) || !state.hintReward) return;
+    if (video && !video.available()) { setText(note, RESULT_COPY.failed); return; }
     attempt = { state, reward: state.hintReward, playing: false };
     record('hint_clicked', state, { reward: state.hintReward });
     setText(note, '');
     setText(message, REWARD_COPY[state.hintReward]);
     setHidden(consent, false);
-    setHidden(detail, state.hintsUsed > 0);
+    setText(detail, ctx.api.campaign?.district ? '视频开始播放后，本局无法解锁下一关。' : '视频开始播放后，本局不计入孤勇者榜。');
+    setHidden(detail, state.adPlayed === true);
     setHidden(mockActions, true);
     ctx.api.setHintAdActive(true);
     dialog.showModal();
@@ -134,11 +135,13 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     setHidden(consent, true);
     setHidden(detail, true);
     setText(message, mock ? '本地模拟激励视频' : '正在播放激励视频…');
-    const shown = (): void => record('ad_shown', current.state, { reward: current.reward });
+    const shown = (): void => {
+      ctx.api.markAdPlayed?.(current.state.runId);
+      record('ad_shown', current.state, { reward: current.reward });
+    };
     if (mock) {
       setHidden(mockActions, false);
       complete.focus();
-      shown();
     } else {
       void video.play(shown).then((outcome) => finish(current, outcome));
     }
@@ -160,9 +163,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
       record('run_abandoned', state, { views });
     }
   });
-  const unlock = window.setInterval(() => refresh(), 1_000);
   ctx.disposer.add(() => {
-    clearInterval(unlock);
     if (attempt) close();
   });
 

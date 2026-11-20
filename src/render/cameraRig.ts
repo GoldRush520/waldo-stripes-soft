@@ -58,6 +58,7 @@ export class CameraRig {
   private readonly abort = new AbortController();
   /** Unrestricted camera controls for development. */
   interactive = false;
+  overviewPpm: ((w: number, h: number) => number) | null = null;
   /** Allow exploration while a round is active. */
   pannable = true;
   /** keeps a goal view over the generated world; set by the game */
@@ -164,7 +165,8 @@ export class CameraRig {
 
   private clampGoal(): void {
     const g = this.goal;
-    g.ppm = Math.min(MAX_PPM, Math.max(this.minPpm, g.ppm));
+    const floor = this.overviewPpm?.(this.width, this.height) ?? this.minPpm;
+    g.ppm = Math.min(MAX_PPM, Math.max(floor, g.ppm));
     g.elevation = Math.min(MAX_EL, Math.max(MIN_EL, g.elevation));
     g.x = Math.min(this.bounds.maxX, Math.max(this.bounds.minX, g.x));
     g.z = Math.min(this.bounds.maxZ, Math.max(this.bounds.minZ, g.z));
@@ -185,8 +187,8 @@ export class CameraRig {
     const g = this.goal;
     const before = g.ppm;
     const base = basePpm(this.width, this.height);
-    const min = this.interactive ? this.minPpm : base * 0.75;
-    const max = this.interactive ? MAX_PPM : base * 1.5;
+    const min = this.interactive ? this.minPpm : this.overviewPpm?.(this.width, this.height) ?? base * 0.75;
+    const max = this.interactive ? MAX_PPM : base * (this.overviewPpm ? 2 : 1.5);
     g.ppm = THREE.MathUtils.clamp(g.ppm * factor, min, max);
     const cx = px - this.width / 2;
     const cy = py - this.height / 2;

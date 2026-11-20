@@ -13,7 +13,8 @@ import { WORLD, districtById, isLand, pointInPolygon } from '../world/layout';
 import type { HeroCandidate, Town } from '../world/town';
 import type { ClickFeedback, GameApi, GameState, HintOutline, QualitySetting, SecondaryTarget } from './api';
 import { type Rect, VIEW_ELEVATION, type ViewSpec, basePpm, clampView, projectPoint, screenHeight } from './composition';
-import { type SearchArea, searchAreas } from './searchHints';
+import { type SearchArea, searchAreas, hintBoundary } from './searchHints';
+import { type Campaign, stageFrame } from './campaign';
 
 const SECONDARY_COUNT = 5;
 /** GPU visibility checks are spent on at most this many shortlisted candidates per puzzle */
@@ -125,13 +126,15 @@ export class Game implements GameApi {
   /** HUD rectangles in CSS px (kept for layout-aware features; the hero is found by panning) */
   hudBlocks: () => readonly Rect[] = () => [];
 
-  constructor(private readonly engine: Engine) {
+  private frame: ReturnType<typeof stageFrame> | null = null;
+
+  constructor(private readonly engine: Engine, readonly campaign?: Campaign) {
     engine.rig.onTap = (x, y) => this.click(x, y);
     engine.onResolutionChange = () => this.recompose();
     /* panning is clamped to the generated world for the current viewport */
     engine.rig.constrain = (goal) => {
       const { width, height } = engine.rig.size;
-      const v = clampView({ x: goal.x, z: goal.z, azimuth: goal.azimuth, elevation: goal.elevation, ppm: goal.ppm }, width, height);
+      const v = this.frame ? this.frame.constrain(goal, width, height) : clampView(goal, width, height);
       goal.x = v.x;
       goal.z = v.z;
     };
@@ -148,7 +151,7 @@ export class Game implements GameApi {
     this.town = town;
     this.probe = town.crowd.createProbe();
     this.indexPeople();
-    await this.warmUp();
+    if (!this.campaign?.district) await this.warmUp();
     await this.beginPuzzle(seedText, true);
   }
 
@@ -235,10 +238,17 @@ export class Game implements GameApi {
       this.set({ status: 'loading', progress: 0.97 });
       const rng = createRng(hashString(seedText)).fork(`puzzle-${this.puzzleCount}`);
       if (this.puzzleCount === 0) this.azimuth = BASE_AZIMUTH + rng.range(-0.3, 0.3);
+      const district = this.campaign?.district;
+      if (this.campaign) {
+        const frame = stageFrame(district?.polygon, this.azimuth);
+        this.frame = frame;
+        this.engine.rig.overviewPpm = (w, h) => frame.fit(w, h);
+      }
       type Attempt = { c: HeroCandidate; vis: VisibilityResult; heading: number; phase: number };
       const shortlist: HeroCandidate[] = [];
       let scanned = 0;
       for (const c of rng.shuffle(town.heroCandidates())) {
+        if (district && !pointInPolygon(c.x, c.z, district.polygon)) continue;
         if (shortlist.length >= MAX_CANDIDATES || scanned >= 900) break;
         if (c.x < WORLD.minX + 8 || c.x > WORLD.maxX - 8 || c.z < WORLD.minZ + 8 || !this.supported(c)) continue;
         scanned++;
@@ -249,7 +259,10 @@ export class Game implements GameApi {
       let chosen = null as Attempt | null;
       let best = null as Attempt | null;
       let tried = 0;
-      const centred = (c: HeroCandidate): ViewSpec => clampView({ x: c.x, z: c.z, azimuth: this.azimuth, elevation: VIEW_ELEVATION, ppm: basePpm(width, height) }, width, height);
+      const centred = (c: HeroCandidate): ViewSpec => {
+        const view = { x: c.x, z: c.z, azimuth: this.azimuth, elevation: VIEW_ELEVATION, ppm: basePpm(width, height) };
+        return district ? view : clampView(view, width, height);
+      };
       for (const c of shortlist) {
         tried++;
         const heading = this.azimuth + rng.range(-0.85, 0.85);
@@ -277,9 +290,12 @@ export class Game implements GameApi {
       }
       /* opening view: the busiest of a few seeded crops that keep the hero well off screen */
       const hero = chosen.c;
-      let opening: ViewSpec | null = null;
+      let opening: ViewSpec | null = district ? {
+        x: district.anchor[0], z: district.anchor[1], azimuth: this.azimuth,
+        elevation: VIEW_ELEVATION, ppm: basePpm(width,height),
+      } : null;
       let openingScore = -Infinity;
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; !district && i < 40; i++) {
         const view = clampView(
           { x: rng.range(WORLD.minX, WORLD.maxX), z: rng.range(WORLD.minZ, 60), azimuth: this.azimuth, elevation: VIEW_ELEVATION, ppm: basePpm(width, height) },
           width,
@@ -334,6 +350,7 @@ export class Game implements GameApi {
       elapsedMs: 0,
       wrongClicks: 0,
       hintsUsed: relocate ? 0 : this.state.hintsUsed,
+      adPlayed: relocate ? false : this.state.adPlayed === true,
       hintReward: relocate ? 'range' : this.state.hintReward,
       hintOutline: null,
       secondary,
@@ -550,13 +567,13 @@ export class Game implements GameApi {
     let outline: HintOutline | null = null;
     if (area && this.town) {
       const y = this.town.hero.spot.y;
-      outline = [
-        this.screen(area.minX, y, area.minZ), this.screen(area.maxX, y, area.minZ),
-        this.screen(area.maxX, y, area.maxZ), this.screen(area.minX, y, area.maxZ),
-      ].map(({ x, y: screenY }) => [x, screenY] as const);
+      outline = hintBoundary(area, this.campaign?.district?.polygon).map(([x, z]) => {
+        const screen = this.screen(x, y, z);
+        return [screen.x, screen.y] as const;
+      });
     }
     const previous = s.hintOutline;
-    if (outline === null ? previous === null : previous && outline.every(([x, y], index) =>
+    if (outline === null ? previous === null : previous && previous.length === outline.length && outline.every(([x, y], index) =>
       Math.abs(x - previous[index][0]) < 0.4 && Math.abs(y - previous[index][1]) < 0.4)) return;
     this.state = { ...this.state, hintOutline: outline };
     this.dirty = true;
@@ -597,6 +614,7 @@ export class Game implements GameApi {
     const person = id - 1;
     const feedback = (kind: ClickFeedback['kind'], message: string | null): ClickFeedback => ({ kind, x, y, serial, message });
     if (id > 0 && person === town.hero.person) {
+      this.campaign?.finish(this.state.elapsedMs, this.state.adPlayed === true);
       this.set({ status: 'won', lastClick: feedback('hit', null), hintText: null });
       return;
     }
@@ -614,6 +632,18 @@ export class Game implements GameApi {
   }
 
   /* ---------------------------------------------------------------- GameApi */
+
+  markAdPlayed(runId: number): void {
+    if (this.hintAdActive && this.state.status === 'playing' && runId === this.state.runId) this.set({adPlayed: true});
+  }
+
+  enterStage(stage: number): void {
+    if (!this.campaign?.canPlay(stage)) return;
+    if (stage === this.campaign.stage) { this.newPuzzle(); return; }
+    const url = new URL(location.href);
+    url.searchParams.set('stage', String(stage));
+    location.replace(url);
+  }
 
   getState(): GameState {
     return this.state;
@@ -664,8 +694,10 @@ export class Game implements GameApi {
     if (!town || !this.hintAdActive || state.runId !== runId || state.status !== 'playing' || state.waiting || !state.hintReward) return false;
 
     if (!this.hintPlan) {
+      const district = this.campaign?.district;
       const candidates = town.build.people.all().filter((person, index) =>
-        index !== town.hero.person && person.motion < 0 && !person.roaming && person.scale >= 0.1);
+        index !== town.hero.person && person.motion < 0 && !person.roaming && person.scale >= 0.1 &&
+        (!district || pointInPolygon(person.x, person.z, district.polygon)));
       this.hintPlan = searchAreas(town.hero.spot, candidates, state.seed);
     }
     const hintsUsed = state.hintsUsed + 1;

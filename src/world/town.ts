@@ -144,9 +144,9 @@ export class Town {
   }
 
   /** Progressive build: one district per task so the page stays responsive while loading. */
-  static async create(seedText: string, onProgress: (p: number) => void = () => undefined, opts: { jointTexture?: boolean } = {}): Promise<Town> {
+  static async create(seedText: string, onProgress: (p: number) => void = () => undefined, opts: { jointTexture?: boolean; only?: readonly DistrictId[] } = {}): Promise<Town> {
     const t0 = performance.now();
-    const town = new Town(seedText, { defer: true, jointTexture: opts.jointTexture });
+    const town = new Town(seedText, { ...opts, defer: true });
     /* yield with a message task, not a timer: timers are throttled to seconds in background tabs */
     const pause = (): Promise<void> =>
       new Promise((resolve) => {
