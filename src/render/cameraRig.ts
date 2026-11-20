@@ -1,13 +1,12 @@
 /**
  * The art-directed elevated three-quarter camera.
  *
- * In the product the scale and angle are fixed (no zoom, no orbit) and the player explores by
- * panning: drag, two-finger scroll, or arrow keys / WASD. Clicks and taps are reported for picking.
- * Zoom and orbit exist solely for development inspection (`interactive = true`, via `?dev=free`).
+ * Players explore by panning and pinching the touchscreen. Orbit is reserved for development.
  * Scale is expressed as pixels-per-metre so framing and level-of-detail decisions are independent
  * of viewport size. Ctrl/pinch wheel gestures are never intercepted, so browser zoom keeps working.
  */
 import * as THREE from 'three';
+import { basePpm } from '../game/composition';
 
 export interface ViewState {
   x: number;
@@ -57,9 +56,9 @@ export class CameraRig {
   private dirty = true;
   private readonly keys = new Set<string>();
   private readonly abort = new AbortController();
-  /** development-only zoom and orbit (never enabled in the product) */
+  /** Unrestricted camera controls for development. */
   interactive = false;
-  /** panning across the town (the product's only camera control) */
+  /** Allow exploration while a round is active. */
   pannable = true;
   /** keeps a goal view over the generated world; set by the game */
   constrain: ((view: ViewState) => void) | null = null;
@@ -185,7 +184,10 @@ export class CameraRig {
   private zoomAt(factor: number, px: number, py: number): void {
     const g = this.goal;
     const before = g.ppm;
-    g.ppm = Math.min(MAX_PPM, Math.max(this.minPpm, g.ppm * factor));
+    const base = basePpm(this.width, this.height);
+    const min = this.interactive ? this.minPpm : base * 0.75;
+    const max = this.interactive ? MAX_PPM : base * 1.5;
+    g.ppm = THREE.MathUtils.clamp(g.ppm * factor, min, max);
     const cx = px - this.width / 2;
     const cy = py - this.height / 2;
     const k = 1 / before - 1 / g.ppm;
@@ -240,17 +242,19 @@ export class CameraRig {
       } else {
         this.pan(dx, dy);
       }
-    } else if (this.pointers.size === 2 && this.interactive) {
+    } else if (this.pointers.size === 2 && (this.interactive || (this.pannable && e.pointerType === 'touch'))) {
       const [a, b] = [...this.pointers.values()];
       if (a && b) {
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const angle = Math.atan2(b.y - a.y, b.x - a.x);
-        if (this.pinchDist > 0) this.zoomAt(dist / this.pinchDist, (a.x + b.x) / 2, (a.y + b.y) / 2);
-        let da = angle - this.pinchAngle;
-        if (da > Math.PI) da -= Math.PI * 2;
-        if (da < -Math.PI) da += Math.PI * 2;
-        this.goal.azimuth -= da;
         this.pan(dx / 2, dy / 2);
+        if (this.pinchDist > 0 && dist > 0) this.zoomAt(dist / this.pinchDist, (a.x + b.x) / 2, (a.y + b.y) / 2);
+        if (this.interactive) {
+          let da = angle - this.pinchAngle;
+          if (da > Math.PI) da -= Math.PI * 2;
+          if (da < -Math.PI) da += Math.PI * 2;
+          this.goal.azimuth -= da;
+        }
         this.pinchDist = dist;
         this.pinchAngle = angle;
       }

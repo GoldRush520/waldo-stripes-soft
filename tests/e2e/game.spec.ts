@@ -82,7 +82,7 @@ test('a debug seed reproduces the puzzle; an ordinary visit gets a fresh seed', 
   expect(heroA).not.toEqual(heroB);
 });
 
-test('the player can pan but never zoom', async ({ page }) => {
+test('desktop pan controls preserve scale and angle', async ({ page }) => {
   await open(page, '&seed=e2e-pan');
   const start = await view(page);
   const box = (await page.locator('canvas').boundingBox())!;

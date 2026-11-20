@@ -419,9 +419,11 @@ export class Game implements GameApi {
     if (!this.town || !this.view) return;
     const { width, height } = this.engine.rig.size;
     const s = this.engine.rig.state;
-    const view = clampView({ x: s.x, z: s.z, azimuth: this.azimuth, elevation: VIEW_ELEVATION, ppm: basePpm(width, height) }, width, height);
+    const base = basePpm(width, height);
+    const zoom = this.engine.rig.goalPpm / this.view.ppm;
+    const view = clampView({ x: s.x, z: s.z, azimuth: this.azimuth, elevation: VIEW_ELEVATION, ppm: base }, width, height);
     this.view = view;
-    this.engine.rig.setView(view, true);
+    this.engine.rig.setView({ ...view, ppm: base * zoom }, true);
     this.updateMarker();
   }
 
@@ -688,13 +690,12 @@ export class Game implements GameApi {
     }, true);
   }
 
-  /* zoom and orbit are not part of the product; these stay as harmless no-ops */
   resetView(): void {
     if (this.view) this.engine.rig.setView(this.view);
   }
 
   zoomBy(_factor: number): void {
-    /* no in-game zoom */
+    /* Touch zoom is handled at the two-finger midpoint by the camera rig. */
   }
 
   rotateBy(_radians: number): void {
