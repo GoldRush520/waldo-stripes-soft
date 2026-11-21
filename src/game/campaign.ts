@@ -54,12 +54,11 @@ export function loadCampaign(): Campaign {
   let storage: Storage | null = null;
   try { storage = window.localStorage; } catch { /* Play in memory when storage is blocked. */ }
   const url = new URL(location.href);
-  const stage = Number(url.searchParams.get('stage'));
   if (url.searchParams.has('stage')) {
     url.searchParams.delete('stage');
     history.replaceState(history.state, '', url);
   }
-  return new Campaign(storage, stage);
+  return new Campaign(storage, 0);
 }
 
 const townOutline: readonly Pt[] = [

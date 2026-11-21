@@ -637,14 +637,6 @@ export class Game implements GameApi {
     if (this.hintAdActive && this.state.status === 'playing' && runId === this.state.runId) this.set({adPlayed: true});
   }
 
-  enterStage(stage: number): void {
-    if (!this.campaign?.canPlay(stage)) return;
-    if (stage === this.campaign.stage) { this.newPuzzle(); return; }
-    const url = new URL(location.href);
-    url.searchParams.set('stage', String(stage));
-    location.replace(url);
-  }
-
   getState(): GameState {
     return this.state;
   }

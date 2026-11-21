@@ -1,102 +1,74 @@
-import { Game, randomSeed } from './game/game';
 import { loadCampaign } from './game/campaign';
-import { Engine } from './render/engine';
-import { hudSafeInsets, mountHud } from './ui/index';
 import { debugParams } from './dev/debugParams';
-import { installDevTools } from './dev/devTools';
-import { Town } from './world/town';
+import { el } from './ui/dom';
+import { showStageSelect } from './ui/stageSelect';
 
-const engine = new Engine(document.getElementById('app') as HTMLElement);
+const ui = document.getElementById('ui')!;
 const campaign = import.meta.env.MODE === 'taptap' ? loadCampaign() : undefined;
-const game = new Game(engine, campaign);
-/* debugging switches only work on a developer's own machine; a public host ignores them all */
-const params = debugParams(location);
-/* every visit gets a fresh local seed; `?seed=` is a debugging override for reproducible scenes */
-const seed = params.get('seed') ?? randomSeed();
-let town: Town | null = null;
+let disposeGame: (() => void) | undefined;
+let loading = false;
 
-engine.addSystem({
-  update(animDt, e) {
-    if (town) town.update(animDt, e, game.reducedMotion);
-    game.update(animDt);
-  },
-});
-engine.dynamicShadows = () => (town ? town.crowd.currentTier >= 1 && town.crowd.castShadows : false);
-mountHud(document.getElementById('ui') as HTMLElement, game);
-/* debugging override for reproducible measurements: ?quality=low|medium|high pins the quality */
-const pinned = params.get('quality');
-if (pinned === 'low' || pinned === 'medium' || pinned === 'high') game.setQuality(pinned);
-game.hudBlocks = () => hudSafeInsets().blocks;
-window.addEventListener('resize', () => game.recompose());
-engine.start();
+function leaveGame(): void {
+  disposeGame?.();
+  disposeGame = undefined;
+  ui.replaceChildren();
+}
 
-/* boot timeline for developer evidence (startup measurement); not shown in the product UI */
-const boot: { stage: string; progress: number; marks: Record<string, number> } = { stage: 'building', progress: 0, marks: { start: performance.now() } };
-if (params.has('dev')) (window as unknown as { __boot: typeof boot }).__boot = boot;
+function showStages(): void {
+  if (!campaign || loading) return;
+  leaveGame();
+  showStageSelect(ui, campaign, enterStage);
+}
 
-/** Terminal failure state: stop the loading UI and offer a retry with a fresh seed. */
+function enterStage(stage: number): void {
+  if (!campaign?.canPlay(stage) || loading) return;
+  leaveGame();
+  campaign.stage = stage;
+  void play();
+}
+
 function fail(error: unknown): void {
-  boot.stage = `failed: ${error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error)}`;
-  const ui = document.getElementById('ui');
-  if (ui) ui.hidden = true;
-  const box = document.createElement('div');
-  box.setAttribute('role', 'alert');
-  box.style.cssText =
-    'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(420px,86vw);padding:20px 22px;border-radius:16px;background:#F7F3EE;border:1px solid #D9B8A8;box-shadow:0 10px 30px rgba(91,64,56,.18);font:15px/1.45 system-ui,sans-serif;color:#5B4038;text-align:center';
-  const text = document.createElement('p');
-  text.style.margin = '0 0 14px';
-  text.textContent = import.meta.env.MODE === 'taptap' ? '小镇加载失败，请重试。' : 'The festival town could not be set up this time.';
-  box.append(text);
-  if (import.meta.env.MODE !== 'taptap' || params.has('dev')) {
-    const detail = document.createElement('p');
-    detail.style.cssText = 'margin:0 0 14px;font-size:12px;opacity:.75';
-    detail.textContent = error instanceof Error ? error.message : String(error);
-    box.append(detail);
-  }
-  const retry = document.createElement('button');
-  retry.type = 'button';
-  retry.textContent = import.meta.env.MODE === 'taptap' ? '重试' : 'Try a new scene';
-  retry.style.cssText = 'font:inherit;padding:9px 16px;border-radius:999px;border:0;background:#F28B82;color:#3E2C2A;cursor:pointer';
-  retry.addEventListener('click', () => {
+  leaveGame();
+  const english = !campaign;
+  const box = el('div', { className: 'game-load-error', attrs: { role: 'alert' } });
+  box.append(el('p', { text: english ? 'The festival town could not be set up this time.' : '小镇加载失败，请重试。' }));
+  const detail = error instanceof Error ? error.message : String(error);
+  if (english || debugParams(location).has('dev')) box.append(el('p', { text: detail }));
+  const boot = (window as unknown as { __boot?: { stage: string } }).__boot;
+  if (boot) boot.stage = 'failed: ' + detail;
+  const retry = el('button', { text: english ? 'Try a new scene' : '重试' });
+  retry.onclick = () => {
     const url = new URL(location.href);
     url.searchParams.delete('seed');
-    location.assign(url);
-  });
+    history.replaceState(history.state, '', url);
+    void play();
+  };
   box.append(retry);
-  document.body.appendChild(box);
+  if (campaign) {
+    const back = el('button', { text: '返回选关' });
+    back.onclick = showStages;
+    box.append(back);
+  }
+  ui.replaceChildren(box);
   retry.focus();
 }
-game.onFailure = fail;
 
-/*
- * Optional crowd path that resolves joint matrices once per person in a GPU pass (`?joints=1`).
- * Measured on the baseline machine it is no faster than posing per vertex (see PERFORMANCE.md),
- * so the simpler per-vertex path is the default.
- */
-const jointTexture = params.get('joints') === '1' && engine.renderer.capabilities.isWebGL2 && engine.renderer.extensions.has('EXT_color_buffer_float');
+async function play(): Promise<void> {
+  if (loading) return;
+  loading = true;
+  ui.replaceChildren();
+  const message = el('p', { className: 'stage-loading', text: campaign ? '正在载入' + campaign.name + '…' : 'Loading the festival town…', attrs: { role: 'status' } });
+  ui.append(message);
+  try {
+    const { startGame } = await import('./play');
+    disposeGame = await startGame(campaign, campaign ? { enterStage, showStages } : undefined, fail);
+    message.remove();
+  } catch (error) {
+    fail(error);
+  } finally {
+    loading = false;
+  }
+}
 
-Town.create(
-  seed,
-  (p) => {
-    boot.progress = p * 0.95;
-    game.setProgress(p * 0.95);
-  },
-  { jointTexture, ...(campaign?.district ? { only: [campaign.district.id] } : {}) },
-)
-  .then(async (built) => {
-    boot.stage = 'composing';
-    boot.marks.built = performance.now();
-    town = built;
-    engine.scene.add(built.group);
-    /* measurement-only switches (dev): isolate the cost of individual render components */
-    if (params.get('crowdShadows') === '0') built.crowd.setCastShadows(false);
-    if (params.get('noCrowd') === '1') built.crowd.group.visible = false;
-    if (params.get('noStatics') === '1') built.build.statics.group.visible = false;
-    if (params.get('noDynamics') === '1') built.build.dynamics.group.visible = false;
-    if (params.get('noShadows') === '1') engine.sun.castShadow = false;
-    await game.attach(built, seed);
-    boot.stage = 'playing';
-    boot.marks.playing = performance.now();
-    if (params.has('dev')) installDevTools(engine, built, game);
-  })
-  .catch(fail);
+if (campaign) showStages();
+else void play();

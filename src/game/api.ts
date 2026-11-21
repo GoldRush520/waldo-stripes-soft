@@ -58,7 +58,6 @@ export interface GameState {
 export interface GameApi {
   readonly campaign?: import('./campaign').Campaign;
   markAdPlayed?(runId: number): void;
-  enterStage?(stage: number): void;
   getState(): GameState;
   /** Subscribe to state changes; returns an unsubscribe function. Called at most once per frame. */
   subscribe(listener: (state: GameState) => void): () => void;

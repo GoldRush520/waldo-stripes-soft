@@ -49,7 +49,6 @@
   padding-left: 12px;
   font-size: 14px;
 }
-.wss-stage-select { min-height: 44px; width: 100%; font: inherit; }
 
 .wss-side { display: flex; flex-direction: column; align-items: flex-end; }
 .wss-side-head { position: relative; }

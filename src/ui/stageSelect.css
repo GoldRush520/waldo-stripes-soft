@@ -1,0 +1,77 @@
+.stage-home, .stage-home * { box-sizing: border-box; }
+.stage-home {
+  position: absolute; inset: 0; overflow: auto; pointer-events: auto;
+  padding: max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right))
+           max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+  display: grid; align-items: safe center; justify-items: center;
+  background: #dbe9e4; color: #233e3b; font: 16px/1.35 system-ui, "PingFang SC", sans-serif;
+}
+.stage-board {
+  width: min(1180px, 100%); display: grid; grid-template-columns: 26% 1fr;
+  overflow: hidden; border: 1px solid #9db7ad; border-radius: 18px;
+  background: #fffbef; box-shadow: 0 10px 38px #364d4525;
+}
+.stage-home h1, .stage-home h2, .stage-home p { margin: 0; }
+.stage-cover { display: flex; flex-direction: column; background: #174d4b; color: #fff9e8; }
+.stage-art {
+  flex: 1; min-height: 90px; position: relative;
+  background: #67b6cf url('./assets/town-cover.webp') center 40% / cover;
+}
+.stage-art::after {
+  content: ''; position: absolute; inset: auto 0 0; height: 8px;
+  background: repeating-linear-gradient(115deg,#e76d49 0 17px,#fff2cf 17px 34px);
+}
+.stage-summary { padding: clamp(12px, 2vw, 24px); }
+.stage-summary h1 { font-size: clamp(23px, 3.2vw, 42px); letter-spacing: .06em; }
+.stage-progress, .stage-number, .stage-final { display: flex; align-items: center; justify-content: space-between; }
+.stage-progress { margin-top: 10px; font-size: 14px; }
+.stage-summary progress { width: 100%; height: 7px; appearance: none; border: 0; border-radius: 6px; overflow: hidden; background: #477370; }
+.stage-summary progress::-webkit-progress-bar { background: #477370; }
+.stage-summary progress::-webkit-progress-value { background: #ffd27f; }
+.stage-summary progress::-moz-progress-bar { background: #ffd27f; }
+.stage-summary p { font-size: 13px; margin-top: 6px; }
+.stage-list { padding: clamp(12px, 2.2vw, 32px); min-width: 0; }
+.stage-list h2 { font-size: clamp(21px, 2.6vw, 34px); }
+.stage-list > p { margin: 3px 0 12px; font-size: 14px; color: #51625c; }
+.stage-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 9px; }
+.stage-tile {
+  cursor: pointer; text-align: left; padding: 10px; min-height: 74px;
+  border: 1px solid #cbcabb; border-radius: 10px; background: #f0f0e4; color: #485953; font: inherit;
+}
+.stage-number, .stage-tile small { font-size: 12px; }
+.stage-number { font-weight: 700; }
+.stage-tile strong, .stage-tile small { display: block; }
+.stage-tile strong { margin: 2px 0; font-size: clamp(16px, 1.7vw, 22px); }
+.stage-tile[data-state=done] { color: #205242; background: #dff0df; border-color: #a7c8ad; }
+.stage-tile[data-state=current] { color: #613214; background: #ffe3b4; border: 2px solid #c26625; }
+.stage-icon { font-size: 15px; line-height: 1; }
+.stage-lock { position: relative; width: 11px; height: 8px; background: currentColor; border-radius: 2px; margin-top: 4px; }
+.stage-lock::before { content: ''; position: absolute; left: 2px; top: -5px; width: 7px; height: 6px; border: 1.5px solid currentColor; border-bottom: 0; border-radius: 5px 5px 0 0; box-sizing: border-box; }
+.stage-board .stage-final { gap: 8px; width: 100%; min-height: 54px; margin-top: 10px; color: #fff9e8; background: #224f52; }
+.stage-final strong { font-size: 17px; }
+.stage-end { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.stage-tile:focus-visible { outline: 3px solid #077986; outline-offset: 2px; }
+.stage-loading { position: absolute; inset: 0; display: grid; place-content: center; margin: 0; background: #fffbef; color: #233e3b; font: 600 18px system-ui,sans-serif; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .stage-list { padding: 8px 14px; }
+  .stage-list h2 { font-size: 21px; }
+  .stage-list > p { margin: 1px 0 6px; font-size: 12px; }
+  .stage-grid { gap: 6px; }
+  .stage-tile { padding: 4px 8px; min-height: 48px; }
+  .stage-tile strong { margin: 0; font-size: 16px; }
+  .stage-board .stage-final { min-height: 44px; margin-top: 6px; }
+  .stage-summary { padding: 10px 14px; }
+  .stage-summary h1 { font-size: 23px; }
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .stage-board { display: block; }
+  .stage-cover { display: grid; grid-template-columns: 32% 1fr; }
+  .stage-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+.stage-loading { z-index: 2; }
+.game-load-error {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  pointer-events: auto; padding: 18px 24px; border-radius: 14px; background: #fffbef;
+  color: #233e3b; text-align: center; font: 16px/1.4 system-ui,sans-serif;
+}
+.game-load-error button { min-height: 44px; padding: 6px 12px; margin: 4px; cursor: pointer; }

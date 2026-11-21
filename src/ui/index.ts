@@ -11,7 +11,7 @@ import { createHowToPlay } from './howToPlay';
 import { createBoardModel } from './leaderboard/model';
 import { createSideBoard } from './leaderboard/sideBoard';
 import { TAPTAP_LEADERBOARD_ID_PLACEHOLDER } from './leaderboard/taptap';
-import { createTapTapWinCard } from './leaderboard/taptapPanel';
+import { createTapTapWinCard, type CampaignNavigation } from './leaderboard/taptapPanel';
 import { rememberReducedMotion } from './preferences';
 import { trackSafeInsets } from './safeInsets';
 import type { HudContext, HudPart } from './types';
@@ -43,7 +43,7 @@ function syncRootFlags(hud: HTMLElement, prev: GameState | null, next: GameState
   if (changed(prev, next, 'paused')) hud.dataset['paused'] = String(next.paused);
 }
 
-export function mountHud(root: HTMLElement, api: GameApi): HudHandle {
+export function mountHud(root: HTMLElement, api: GameApi, navigation?: CampaignNavigation): HudHandle {
   const disposer = createDisposer();
   const announcer = createAnnouncer();
   const ctx: HudContext = { api, disposer, announce: announcer.announce, rememberReducedMotion };
@@ -70,10 +70,9 @@ export function mountHud(root: HTMLElement, api: GameApi): HudHandle {
     corner.append(side.el);
   }
   const win = board ? createWinCard(ctx, board) : createTapTapWinCard(
-    ctx, import.meta.env.VITE_TAPTAP_LEADERBOARD_ID || TAPTAP_LEADERBOARD_ID_PLACEHOLDER,
+    ctx, import.meta.env.VITE_TAPTAP_LEADERBOARD_ID || TAPTAP_LEADERBOARD_ID_PLACEHOLDER, navigation,
   );
-  const howTo = createHowToPlay(ctx);
-  const parts: HudPart[] = [howTo, win];
+  const parts: HudPart[] = api.campaign ? [win] : [createHowToPlay(ctx), win];
   if (import.meta.env.MODE === 'taptap') {
     const id: string = import.meta.env.VITE_TAPTAP_REWARDED_AD_UNIT_ID || TAPTAP_AD_UNIT_ID_PLACEHOLDER;
     const mock = debugParams(location).get('mockAds') === '1';

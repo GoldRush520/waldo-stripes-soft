@@ -5,7 +5,12 @@ import { createCompletionCard } from '../winCard';
 import { createTapTapLeaderboard } from './taptap';
 import { STAGES } from '../../game/campaign';
 
-export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): HudPart {
+export interface CampaignNavigation {
+  enterStage(stage: number): void;
+  showStages(): void;
+}
+
+export function createTapTapWinCard(ctx: HudContext, leaderboardId: string, navigation?: CampaignNavigation): HudPart {
   const board = createTapTapLeaderboard(leaderboardId);
   const note = el('p', { className: 'wss-board-note', attrs: { role: 'status' } });
   const openNote = el('p', { className: 'wss-board-note', attrs: { role: 'status' } });
@@ -44,12 +49,15 @@ export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): Hud
     current = null;
   }
 
+  const back = el('button', { className: 'wss-btn', text: '返回选关', attrs: { type: 'button' } });
+  setHidden(back, !navigation);
+  if (navigation) ctx.disposer.listen(back, 'click', navigation.showStages);
   ctx.disposer.listen(retry, 'click', () => void submit());
   ctx.disposer.listen(again, 'click', () => {
     if (ctx.api.getState().status !== 'won') return;
     again.disabled = true;
     const state = ctx.api.getState();
-    if (campaign?.district && !state.adPlayed) ctx.api.enterStage?.(campaign.stage+1);
+    if (campaign?.district && !state.adPlayed) navigation?.enterStage(campaign.stage + 1);
     else ctx.api.newPuzzle();
   });
   ctx.disposer.listen(open, 'click', async () => {
@@ -68,7 +76,7 @@ export function createTapTapWinCard(ctx: HudContext, leaderboardId: string): Hud
   ctx.disposer.add(clearRun);
 
   return createCompletionCard(ctx, {
-    elements: [again, el('div', { className: 'wss-board' }, [note, open, retry, openNote])],
+    elements: [again, back, el('div', { className: 'wss-board' }, [note, open, retry, openNote])],
     open(state): void {
       const unavailable = board.unavailable();
       current = { elapsedMs: state.elapsedMs, practice: !!state.adPlayed || state.hintsUsed > 0, submitting: false };
