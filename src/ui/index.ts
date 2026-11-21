@@ -62,10 +62,14 @@ export function mountHud(root: HTMLElement, api: GameApi, navigation?: CampaignN
   const corner = el('div', { className: 'wss-corner' }, [timer]);
   if (api.campaign) {
     corner.classList.add('wss-campaign-corner');
-    corner.prepend(el('span', {text:`第 ${api.campaign.stage} 关 · ${api.campaign.name}`}));
+    const name = el('span', { text: `第 ${api.campaign.stage} 关 · ${api.campaign.name}` });
+    corner.replaceChildren(el('div', { className: 'wss-stage-info' }, [name, timer]));
   }
   if (api.campaign && navigation) {
-    const exit = el('button', { className: 'wss-btn wss-stage-exit', text: '退出本关', attrs: { type: 'button' } });
+    const exit = el('button', {
+      className: 'wss-btn wss-stage-exit',
+      attrs: { type: 'button', 'aria-label': '返回选关', 'aria-haspopup': 'dialog', title: '返回选关' },
+    });
     const resume = el('button', { className: 'wss-btn wss-btn-primary', text: '继续找人', attrs: { type: 'button' } });
     const leave = el('button', { className: 'wss-btn', text: '返回选关', attrs: { type: 'button' } });
     const dialog = el('dialog', {
@@ -75,7 +79,7 @@ export function mountHud(root: HTMLElement, api: GameApi, navigation?: CampaignN
       el('p', { text: '返回选关将结束本局，已通关的记录会保留。' }),
       el('div', { className: 'wss-hint-dialog-actions' }, [resume, leave]),
     ]);
-    corner.append(exit);
+    corner.prepend(exit);
     hud.append(dialog);
     disposer.listen(exit, 'click', () => {
       const state = api.getState();
