@@ -691,7 +691,7 @@ export class Game implements GameApi {
   requestHint(runId: number): boolean {
     const town = this.town;
     const state = this.state;
-    if (!town || !this.hintAdActive || state.runId !== runId || state.status !== 'playing' || state.waiting || !state.hintReward) return false;
+    if (!town || !state.adPlayed || state.runId !== runId || state.status !== 'playing' || state.waiting || !state.hintReward) return false;
 
     if (!this.hintPlan) {
       const district = this.campaign?.district;

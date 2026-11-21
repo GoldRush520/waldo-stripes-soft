@@ -12,7 +12,7 @@ const REWARD_COPY: Readonly<Record<HintReward, string>> = {
 const RESULT_COPY: Readonly<Record<Exclude<AdOutcome, 'completed'>, string>> = {
   closed: '看完视频才能领取下一条提示。',
   failed: '暂时没有可播放的视频，可以继续找。',
-  timeout: '视频响应超时，可以继续找。',
+  timeout: '广告暂时打不开，可以继续找，稍后再试。',
 };
 
 function action(text: string, primary = false): HTMLButtonElement {
@@ -31,7 +31,9 @@ function record(event: string, state: GameState, detail: Record<string, string |
 interface HintAttempt {
   readonly state: GameState;
   readonly reward: HintReward;
+  readonly controller: AbortController;
   playing: boolean;
+  shown: boolean;
 }
 
 export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | null): HudPart {
@@ -44,6 +46,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
   const detail = el('p', { text: '领取提示后，本局成绩不参与无提示竞速排名。' });
   const watch = action('观看视频', true);
   const cancel = action('继续找');
+  const resume = action('继续找');
   const complete = action('模拟完整观看', true);
   const dismiss = action('模拟提前关闭');
   const fail = action('模拟播放失败');
@@ -51,7 +54,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
   const mockActions = el('div', { className: 'wss-hint-dialog-actions' }, [complete, dismiss, fail]);
   const dialog = el('dialog', {
     className: 'wss-hint-dialog', attrs: { 'aria-labelledby': 'wss-hint-message' },
-  }, [message, detail, consent, mockActions]);
+  }, [message, detail, consent, resume, mockActions]);
   const outline = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
   const marker = el('div', { className: 'wss-hint-target', attrs: { 'aria-hidden': 'true' } });
@@ -62,6 +65,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
   let attempt: HintAttempt | null = null;
   let trackedRun = 0;
   let views = 0;
+  let returnTimer: number | undefined;
 
   function canWatch(state: GameState): boolean {
     return state.status === 'playing' && !state.waiting && !state.paused && state.hintReward !== null;
@@ -71,7 +75,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     const playing = state.status === 'playing' && !state.waiting;
     const available = canWatch(state);
     const reveal = playing && state.marker?.kind === 'reveal' ? state.marker : null;
-    setHidden(entry, !available);
+    setHidden(entry, !available || (attempt !== null && !dialog.open));
     setHidden(review, !playing || state.hintsUsed === 0);
     setHidden(controls, !playing || (!available && state.hintsUsed === 0 && !note.textContent));
     const label = state.hintReward === 'reveal' ? '标出旅人' : state.hintsUsed ? '缩小范围' : '搜索提示';
@@ -81,14 +85,39 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     polygon.setAttribute('points', playing && state.hintOutline ? state.hintOutline.map(([x, y]) => `${x},${y}`).join(' ') : '');
   }
 
-  function close(): void {
-    attempt = null;
+  function releaseGame(): void {
+    window.clearTimeout(returnTimer);
+    if (!dialog.open) return;
     dialog.close();
     ctx.api.setHintAdActive(false);
     refresh();
     if (!entry.hidden) entry.focus({ preventScroll: true });
     else if (!review.hidden) review.focus({ preventScroll: true });
   }
+
+  function close(): void {
+    const current = attempt;
+    attempt = null;
+    current?.controller.abort();
+    releaseGame();
+    refresh();
+  }
+
+  function resumeWhilePending(): void {
+    if (!attempt?.shown || !dialog.open) return;
+    setText(note, '奖励确认中，可以继续找。');
+    releaseGame();
+  }
+
+  ctx.disposer.listen(document, 'visibilitychange', () => {
+    window.clearTimeout(returnTimer);
+    const current = attempt;
+    if (!document.hidden && current?.playing && !mock && dialog.open) {
+      returnTimer = window.setTimeout(() => {
+        if (attempt === current) resumeWhilePending();
+      }, 5_000);
+    }
+  });
 
   function finish(current: HintAttempt, outcome: AdOutcome): void {
     if (attempt !== current) return;
@@ -115,11 +144,12 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     const state = ctx.api.getState();
     if (attempt || !canWatch(state) || !state.hintReward) return;
     if (video && !video.available()) { setText(note, RESULT_COPY.failed); return; }
-    attempt = { state, reward: state.hintReward, playing: false };
+    attempt = { state, reward: state.hintReward, controller: new AbortController(), playing: false, shown: false };
     record('hint_clicked', state, { reward: state.hintReward });
     setText(note, '');
     setText(message, REWARD_COPY[state.hintReward]);
     setHidden(consent, false);
+    setHidden(resume, true);
     setText(detail, ctx.api.campaign?.district ? '视频开始播放后，本局无法解锁下一关。' : '视频开始播放后，本局不计入孤勇者榜。');
     setHidden(detail, state.adPlayed === true);
     setHidden(mockActions, true);
@@ -134,8 +164,12 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     current.playing = true;
     setHidden(consent, true);
     setHidden(detail, true);
-    setText(message, mock ? '本地模拟激励视频' : '正在播放激励视频…');
+    setText(message, mock ? '本地模拟激励视频' : '正在打开广告…');
     const shown = (): void => {
+      if (attempt !== current) return;
+      current.shown = true;
+      setText(message, '正在等待广告结果。');
+      setHidden(resume, false);
       ctx.api.markAdPlayed?.(current.state.runId);
       record('ad_shown', current.state, { reward: current.reward });
     };
@@ -143,10 +177,11 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
       setHidden(mockActions, false);
       complete.focus();
     } else {
-      void video.play(shown).then((outcome) => finish(current, outcome));
+      void video.play(shown, current.controller.signal).then((outcome) => finish(current, outcome));
     }
   });
 
+  ctx.disposer.listen(resume, 'click', resumeWhilePending);
   ctx.disposer.listen(cancel, 'click', close);
   ctx.disposer.listen(review, 'click', () => ctx.api.focusHint());
   ctx.disposer.listen(complete, 'click', () => { if (attempt) finish(attempt, 'completed'); });
@@ -156,6 +191,7 @@ export function createSearchHintPanel(ctx: HudContext, video: RewardedVideo | nu
     event.preventDefault();
     if (!attempt?.playing) close();
     else if (mock) finish(attempt, 'closed');
+    else resumeWhilePending();
   });
   ctx.disposer.listen(window, 'pagehide', (event) => {
     const state = ctx.api.getState();

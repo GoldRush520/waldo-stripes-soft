@@ -8,6 +8,7 @@ function host() {
   const errors = new Set<() => void>();
   const ad = {
     show: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    destroy: vi.fn(),
     load: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     onClose: (listener: CloseListener) => close.add(listener),
     offClose: (listener: CloseListener) => close.delete(listener),
@@ -53,7 +54,8 @@ describe('TapTap rewarded video', () => {
     listener({ isEnded: true });
     [...close][0]({ isEnded: false });
     expect(await next).toBe('closed');
-    expect(create).toHaveBeenCalledExactlyOnceWith({ adUnitId: 'test-id' });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledWith({ adUnitId: 'test-id', multiton: true });
   });
 
   it('retries an unloaded video once and leaves no listeners after a failure', async () => {
@@ -68,16 +70,68 @@ describe('TapTap rewarded video', () => {
     expect(errors.size).toBe(0);
   });
 
-  it('quarantines a timed out singleton so a late close cannot reward a later attempt', async () => {
+  it('keeps a shown ad eligible after 120 seconds until the SDK confirms completion', async () => {
     vi.useFakeTimers();
-    const { close } = host();
-    const video = createTapTapRewardedVideo('test-id', 10);
-    const pending = video.play(vi.fn());
-    const listener = [...close][0];
-    await vi.advanceTimersByTimeAsync(10);
+    const { close, ad } = host();
+    const video = createTapTapRewardedVideo('test-id');
+    const shown = vi.fn();
+    const pending = video.play(shown);
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(shown).toHaveBeenCalledTimes(1);
+    expect(ad.destroy).not.toHaveBeenCalled();
+    [...close][0]({ isEnded: true });
+    expect(await pending).toBe('completed');
+    expect(ad.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('counts foreground loading time only and allows a retry without accepting a stale close', async () => {
+    vi.useFakeTimers();
+    const page = Object.assign(new EventTarget(), { hidden: false });
+    vi.stubGlobal('document', page);
+    const { close, ad } = host();
+    let resolveShow!: () => void;
+    ad.show.mockImplementationOnce(() => new Promise<void>(resolve => { resolveShow = resolve; }));
+    const video = createTapTapRewardedVideo('test-id', 15_000);
+    const shown = vi.fn();
+    const pending = video.play(shown);
+    const oldClose = [...close][0];
+    await vi.advanceTimersByTimeAsync(5_000);
+    page.hidden = true;
+    page.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(ad.destroy).not.toHaveBeenCalled();
+    page.hidden = false;
+    page.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(await pending).toBe('timeout');
-    listener({ isEnded: true });
-    expect(video.available()).toBe(false);
-    expect(await video.play(vi.fn())).toBe('failed');
+    expect(video.available()).toBe(true);
+    const retry = video.play(vi.fn());
+    resolveShow();
+    oldClose({ isEnded: true });
+    [...close][0]({ isEnded: false });
+    expect(await retry).toBe('closed');
+    expect(shown).not.toHaveBeenCalled();
+  });
+
+  it('drops callbacks and pending loads when the originating run ends', async () => {
+    const { ad, close } = host();
+    let loaded!: () => void;
+    ad.show.mockRejectedValueOnce(new Error('unloaded'));
+    ad.load.mockImplementationOnce(() => new Promise<void>(resolve => { loaded = resolve; }));
+    const signal = new AbortController();
+    const video = createTapTapRewardedVideo('test-id');
+    const shown = vi.fn();
+    const pending = video.play(shown, signal.signal);
+    await Promise.resolve();
+    const oldClose = [...close][0];
+    signal.abort();
+    expect(await pending).toBe('failed');
+    loaded();
+    oldClose({ isEnded: true });
+    await Promise.resolve();
+    expect(shown).not.toHaveBeenCalled();
+    expect(ad.show).toHaveBeenCalledOnce();
+    expect(ad.destroy).toHaveBeenCalledOnce();
+    expect(video.available()).toBe(true);
   });
 });
