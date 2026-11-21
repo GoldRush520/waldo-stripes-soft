@@ -654,6 +654,7 @@ export class Game implements GameApi {
   }
 
   setWaiting(waiting: boolean): void {
+    if (waiting && !this.state.waiting) this.inputEpoch++;
     this.engine.rig.pannable = !waiting && !this.hintAdActive;
     this.set({ waiting });
   }

@@ -50,6 +50,9 @@
   font-size: 14px;
 }
 
+.wss-campaign-corner .wss-stage-exit { pointer-events: auto; padding: 6px 12px; background: #205754; color: #fff; }
+.wss-hud:not([data-status="playing"]) .wss-stage-exit { display: none; }
+
 .wss-side { display: flex; flex-direction: column; align-items: flex-end; }
 .wss-side-head { position: relative; }
 /* the only parts of the corner that take clicks: the close button and the button that reopens */

@@ -64,6 +64,30 @@ export function mountHud(root: HTMLElement, api: GameApi, navigation?: CampaignN
     corner.classList.add('wss-campaign-corner');
     corner.prepend(el('span', {text:`第 ${api.campaign.stage} 关 · ${api.campaign.name}`}));
   }
+  if (api.campaign && navigation) {
+    const exit = el('button', { className: 'wss-btn wss-stage-exit', text: '退出本关', attrs: { type: 'button' } });
+    const resume = el('button', { className: 'wss-btn wss-btn-primary', text: '继续找人', attrs: { type: 'button' } });
+    const leave = el('button', { className: 'wss-btn', text: '返回选关', attrs: { type: 'button' } });
+    const dialog = el('dialog', {
+      className: 'wss-hint-dialog', attrs: { 'aria-labelledby': 'wss-exit-title' },
+    }, [
+      el('strong', { text: '退出本关？', attrs: { id: 'wss-exit-title' } }),
+      el('p', { text: '返回选关将结束本局，已通关的记录会保留。' }),
+      el('div', { className: 'wss-hint-dialog-actions' }, [resume, leave]),
+    ]);
+    corner.append(exit);
+    hud.append(dialog);
+    disposer.listen(exit, 'click', () => {
+      const state = api.getState();
+      if (state.status !== 'playing' || state.waiting || dialog.open) return;
+      api.setWaiting(true);
+      dialog.showModal();
+      resume.focus();
+    });
+    disposer.listen(resume, 'click', () => dialog.close());
+    disposer.listen(dialog, 'close', () => api.setWaiting(false));
+    disposer.listen(leave, 'click', navigation.showStages);
+  }
   if (board) {
     const side = createSideBoard(board);
     disposer.add(side.dispose);
