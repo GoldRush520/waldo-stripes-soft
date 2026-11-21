@@ -30,6 +30,19 @@
 .stage-summary progress::-webkit-progress-value { background: #ffd27f; }
 .stage-summary progress::-moz-progress-bar { background: #ffd27f; }
 .stage-summary p { font-size: 13px; margin-top: 6px; }
+.stage-board-entry {
+  width: 100%; min-height: 44px; margin-top: 5px; padding: 6px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  border: 0; border-radius: 10px; background: #fff0cf; color: #403623;
+  font: inherit; font-weight: 700; cursor: pointer;
+}
+.stage-board-entry::after {
+  content: ''; width: 7px; height: 7px; border-top: 2px solid; border-right: 2px solid;
+  transform: rotate(45deg);
+}
+.stage-board-entry:focus-visible { outline: 3px solid #ffd27f; outline-offset: 2px; }
+.stage-board-entry:disabled { opacity: .7; }
+.stage-board-note:empty { display: none; }
 .stage-list { padding: clamp(12px, 2.2vw, 32px); min-width: 0; }
 .stage-list h2 { font-size: clamp(21px, 2.6vw, 34px); }
 .stage-list > p { margin: 3px 0 12px; font-size: 14px; color: #51625c; }

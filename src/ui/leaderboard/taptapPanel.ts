@@ -10,8 +10,8 @@ export interface CampaignNavigation {
   showStages(): void;
 }
 
-export function createTapTapWinCard(ctx: HudContext, leaderboardId: string, navigation?: CampaignNavigation): HudPart {
-  const board = createTapTapLeaderboard(leaderboardId);
+export function createTapTapWinCard(ctx: HudContext, navigation?: CampaignNavigation): HudPart {
+  const board = createTapTapLeaderboard();
   const note = el('p', { className: 'wss-board-note', attrs: { role: 'status' } });
   const openNote = el('p', { className: 'wss-board-note', attrs: { role: 'status' } });
   const open = el('button', { className: 'wss-btn', text: '查看排行榜', attrs: { type: 'button' } });

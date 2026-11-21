@@ -41,7 +41,7 @@ function request<Result>(invoke: (callback: TapCallback<Result>) => void): Promi
   }).finally(() => clearTimeout(timeout));
 }
 
-export function createTapTapLeaderboard(id: string) {
+export function createTapTapLeaderboard(id: string = import.meta.env.VITE_TAPTAP_LEADERBOARD_ID || TAPTAP_LEADERBOARD_ID_PLACEHOLDER) {
   const leaderboardId = id.trim();
   const configured = leaderboardId !== '' && leaderboardId !== TAPTAP_LEADERBOARD_ID_PLACEHOLDER;
   const unavailable = (): string | null => {

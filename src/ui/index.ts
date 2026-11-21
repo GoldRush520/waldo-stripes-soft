@@ -10,7 +10,6 @@ import { formatTime } from './format';
 import { createHowToPlay } from './howToPlay';
 import { createBoardModel } from './leaderboard/model';
 import { createSideBoard } from './leaderboard/sideBoard';
-import { TAPTAP_LEADERBOARD_ID_PLACEHOLDER } from './leaderboard/taptap';
 import { createTapTapWinCard, type CampaignNavigation } from './leaderboard/taptapPanel';
 import { rememberReducedMotion } from './preferences';
 import { trackSafeInsets } from './safeInsets';
@@ -97,9 +96,7 @@ export function mountHud(root: HTMLElement, api: GameApi, navigation?: CampaignN
     disposer.add(side.dispose);
     corner.append(side.el);
   }
-  const win = board ? createWinCard(ctx, board) : createTapTapWinCard(
-    ctx, import.meta.env.VITE_TAPTAP_LEADERBOARD_ID || TAPTAP_LEADERBOARD_ID_PLACEHOLDER, navigation,
-  );
+  const win = board ? createWinCard(ctx, board) : createTapTapWinCard(ctx, navigation);
   const parts: HudPart[] = api.campaign ? [win] : [createHowToPlay(ctx), win];
   if (import.meta.env.MODE === 'taptap') {
     const id: string = import.meta.env.VITE_TAPTAP_REWARDED_AD_UNIT_ID || TAPTAP_AD_UNIT_ID_PLACEHOLDER;
