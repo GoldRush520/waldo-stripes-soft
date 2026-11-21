@@ -1,3 +1,4 @@
+import { formatTime } from '../format';
 import { formatRunTime } from '../../../shared/leaderboard';
 import { el, setHidden, setText } from '../dom';
 import type { HudContext, HudPart } from '../types';
@@ -39,7 +40,7 @@ export function createTapTapWinCard(ctx: HudContext, navigation?: CampaignNaviga
       run.submitting = false;
     }
     if (run !== current) return;
-    const bestText = `个人最佳 ${formatRunTime(best)}`;
+    const bestText = `个人最佳 ${formatTime(best)}`;
     setText(note, bestText);
     const rank = await board.loadRank().catch(() => null);
     if (run === current && rank) setText(note, `${bestText} · 排名 ${rank}`);

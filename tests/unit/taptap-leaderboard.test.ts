@@ -23,9 +23,9 @@ describe('TapTap H5 leaderboard', () => {
     expect(board.unavailable()).toBeNull();
   });
 
-  it('submits integer milliseconds, uses the returned best time, and opens the public board', async () => {
+  it('submits whole seconds in milliseconds, uses the returned best time, and opens the public board', async () => {
     const submitScores = vi.fn(({ callback }) => callback.onSuccess({
-      results: [{ leaderboardId: 'test-board', scoreResult: { rawScore: 900 } }],
+      results: [{ leaderboardId: 'test-board', scoreResult: { rawScore: 30_000 } }],
     }));
     const loadCurrentPlayerLeaderboardScore = vi.fn(({ callback }) => callback.onSuccess({
       currentUserScore: { rank: 42, rankDisplay: '40+' },
@@ -35,8 +35,8 @@ describe('TapTap H5 leaderboard', () => {
       getLeaderboardManager: () => ({ submitScores, loadCurrentPlayerLeaderboardScore, openLeaderboard }),
     });
     const board = createTapTapLeaderboard(' test-board ');
-    await expect(board.submitTime(1234.2)).resolves.toBe(900);
-    expect(submitScores).toHaveBeenCalledWith(expect.objectContaining({ scores: [{ leaderboardId: 'test-board', score: 1235 }] }));
+    await expect(board.submitTime(40_182)).resolves.toBe(30_000);
+    expect(submitScores).toHaveBeenCalledWith(expect.objectContaining({ scores: [{ leaderboardId: 'test-board', score: 40_000 }] }));
     await expect(board.loadRank()).resolves.toBe('40+');
     await expect(board.open()).resolves.toEqual({});
     const publicBoard = expect.objectContaining({ leaderboardId: 'test-board', collection: 'public' });

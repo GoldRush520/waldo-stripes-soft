@@ -1,3 +1,4 @@
+const CAMPAIGN_TIME_BOARD_ID = 'pdoccqi45a7kf0rjik';
 export const TAPTAP_LEADERBOARD_ID_PLACEHOLDER = 'TAPTAP_LEADERBOARD_ID_PLACEHOLDER';
 
 interface TapCallback<Result> {
@@ -41,7 +42,7 @@ function request<Result>(invoke: (callback: TapCallback<Result>) => void): Promi
   }).finally(() => clearTimeout(timeout));
 }
 
-export function createTapTapLeaderboard(id: string = import.meta.env.VITE_TAPTAP_LEADERBOARD_ID || TAPTAP_LEADERBOARD_ID_PLACEHOLDER) {
+export function createTapTapLeaderboard(id: string = import.meta.env.VITE_TAPTAP_LEADERBOARD_ID ?? CAMPAIGN_TIME_BOARD_ID) {
   const leaderboardId = id.trim();
   const configured = leaderboardId !== '' && leaderboardId !== TAPTAP_LEADERBOARD_ID_PLACEHOLDER;
   const unavailable = (): string | null => {
@@ -60,7 +61,7 @@ export function createTapTapLeaderboard(id: string = import.meta.env.VITE_TAPTAP
     async submitTime(elapsedMs: number): Promise<number> {
       if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) throw new Error('Invalid elapsed time');
       const response = await request<{ readonly results: readonly TapScore[] }>((callback) => manager().submitScores({
-        scores: [{ leaderboardId, score: Math.ceil(elapsedMs) }],
+        scores: [{ leaderboardId, score: Math.max(1, Math.round(elapsedMs / 1000)) * 1000 }],
         callback,
       }));
       const best = response?.results?.find((result) => result.leaderboardId === leaderboardId)?.scoreResult?.rawScore;

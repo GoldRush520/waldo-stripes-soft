@@ -74,18 +74,17 @@ hand the laptop to, not a competition.
 ### TapTap H5 leaderboard
 
 `npm run build:taptap` builds the Simplified Chinese H5 package in `dist-taptap/` with relative asset URLs.
-The build defaults to `TAPTAP_LEADERBOARD_ID_PLACEHOLDER`. To build with your TapTap board ID:
+The build uses the campaign’s permanent TapTap time leaderboard by default. To override its ID:
 
 ```bash
 VITE_TAPTAP_LEADERBOARD_ID=your_leaderboard_id npm run build:taptap
 ```
 
-Create a public, permanent leaderboard in the TapTap developer console. Set the score to a
-numeric integer (milliseconds), sort ascending, and retain the best score. Upload the H5 build
-and verify it in the TapTap client with a test account. The H5 win card automatically submits the
-run if no hints were used, shows your best time and rank, and opens TapTap's leaderboard. The
-placeholder and ordinary browsers show an availability message. Play and the run result continue
-if the board is unavailable. Choose **再玩一局** after a result to start a new puzzle in the same town.
+The **孤勇者榜** is a public, permanent time leaderboard. It sorts fastest first and keeps each
+player's best score. A Stage 13 clear with no ads or hints submits automatically. The game rounds
+the time to the nearest whole second (minimum one), then sends milliseconds to the TapTap SDK.
+The native panel displays short times as, for example, **18.00秒**.
+Players can open the board from the stage selector or the Stage 13 result card.
 
 ### TapTap rewarded hints
 
@@ -96,11 +95,9 @@ To enable live ads, create a rewarded-video placement in the TapTap developer co
 VITE_TAPTAP_REWARDED_AD_UNIT_ID=your_ad_unit_id npm run build:taptap
 ```
 
-Include `VITE_TAPTAP_LEADERBOARD_ID` in the same build to enable the leaderboard. Upload the output
-and check live playback, completion and cancellation in the TapTap client. To exercise the UI
+Upload the output and check live playback, completion and cancellation in the TapTap client. To exercise the UI
 locally with the placeholder, run `npm run dev -- --mode taptap` and open `/?mockAds=1`.
-The localhost simulator bypasses the 60-second grace period and offers complete, early-close and
-failure outcomes.
+The localhost simulator offers complete, early-close and failure outcomes.
 
 The first hint encloses about 96 stationary candidates. Each additional hint drops about half
 until the area contains at most eight candidates. The following reward marks Waldo. Completed
